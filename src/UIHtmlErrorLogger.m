@@ -3,6 +3,8 @@ classdef UIHtmlErrorLogger < handle
     %
     % This class listens for HTMLEventReceived events from a uihtml component
     % and displays JavaScript console errors in the MATLAB command window.
+    % The implementation follows MATLAB's recommended communication pattern
+    % using sendEventToMATLAB from JavaScript to MATLAB.
     %
     % Usage:
     %   % Create uihtml component
@@ -12,8 +14,8 @@ classdef UIHtmlErrorLogger < handle
     %   % Attach error logger
     %   errorLogger = UIHtmlErrorLogger(h);
     %
-    % The HTML file must include the uihtml-error-rerouter.js script for
-    % this class to receive console error messages.
+    % The HTML file must include the uihtml-error-rerouter.js script which
+    % uses sendEventToMATLAB to send console error messages to this class.
     
     properties (Access = private)
         UIHtmlComponent % The uihtml component to listen to

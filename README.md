@@ -70,7 +70,7 @@ Run `examples/demo_matlab.m` for a comprehensive demonstration with multiple err
 
 ## How It Works
 
-1. **JavaScript Side**: The `uihtml-error-rerouter.js` script overrides `console.error()` and captures unhandled errors, then sends them to MATLAB via the uihtml messaging system.
+1. **JavaScript Side**: The `uihtml-error-rerouter.js` script overrides `console.error()` and captures unhandled errors, then sends them to MATLAB using `sendEventToMATLAB()` following MATLAB's recommended communication pattern for htmlComponent.
 
 2. **MATLAB Side**: The `UIHtmlErrorLogger` class listens for `HTMLEventReceived` events, filters for console error messages, and displays them in the command window.
 

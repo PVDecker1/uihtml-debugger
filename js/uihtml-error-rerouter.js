@@ -8,7 +8,8 @@
  * <script src="path/to/uihtml-error-rerouter.js"></script>
  * 
  * The script will automatically capture console.error() calls and send
- * them to MATLAB via the uihtml messaging mechanism.
+ * them to MATLAB via the sendEventToMATLAB function, following MATLAB's
+ * recommended communication pattern for htmlComponent.
  */
 
 (function() {
@@ -25,17 +26,17 @@
         // Format error message for MATLAB
         var errorMessage = "UIHTML Console Error: " + args.join(' ');
         
-        // Send error to MATLAB if uihtml messaging is available
-        if (typeof matlab !== 'undefined' && matlab.postMessage) {
+        // Send error to MATLAB using sendEventToMATLAB (MATLAB's recommended approach)
+        if (typeof sendEventToMATLAB === 'function') {
             try {
-                matlab.postMessage(JSON.stringify({
+                sendEventToMATLAB('consoleError', {
                     type: 'consoleError',
                     message: errorMessage,
                     timestamp: new Date().toISOString(),
                     args: args
-                }));
+                });
             } catch (e) {
-                // Fallback if postMessage fails
+                // Fallback if sendEventToMATLAB fails
                 originalConsoleError.call(console, 'UIHtml Error Rerouter: Failed to send error to MATLAB:', e);
             }
         }
@@ -49,9 +50,9 @@
         var errorMessage = 'Unhandled JavaScript Error: ' + event.message + 
                           ' at ' + event.filename + ':' + event.lineno + ':' + event.colno;
         
-        if (typeof matlab !== 'undefined' && matlab.postMessage) {
+        if (typeof sendEventToMATLAB === 'function') {
             try {
-                matlab.postMessage(JSON.stringify({
+                sendEventToMATLAB('consoleError', {
                     type: 'consoleError',
                     message: errorMessage,
                     timestamp: new Date().toISOString(),
@@ -61,7 +62,7 @@
                         lineno: event.lineno,
                         colno: event.colno
                     }
-                }));
+                });
             } catch (e) {
                 originalConsoleError.call(console, 'UIHtml Error Rerouter: Failed to send unhandled error to MATLAB:', e);
             }
@@ -69,13 +70,13 @@
     });
     
     // Initialize message to confirm script is loaded
-    if (typeof matlab !== 'undefined' && matlab.postMessage) {
+    if (typeof sendEventToMATLAB === 'function') {
         try {
-            matlab.postMessage(JSON.stringify({
+            sendEventToMATLAB('consoleError', {
                 type: 'consoleError',
                 message: 'UIHtml Error Rerouter: Successfully initialized',
                 timestamp: new Date().toISOString()
-            }));
+            });
         } catch (e) {
             // Silent fail for initialization message
         }
