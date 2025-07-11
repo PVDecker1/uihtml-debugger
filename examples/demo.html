@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UIHtml Error Debugger Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .button-group {
+            margin: 20px 0;
+            text-align: center;
+        }
+        button {
+            background-color: #007acc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+        .error-button {
+            background-color: #dc3545;
+        }
+        .error-button:hover {
+            background-color: #c82333;
+        }
+        .status {
+            background-color: #e8f5e8;
+            border: 1px solid #4caf50;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .instructions {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>UIHtml Error Debugger Demo</h1>
+        
+        <div class="instructions">
+            <h3>Instructions:</h3>
+            <ol>
+                <li>This HTML file includes the uihtml-error-rerouter.js script</li>
+                <li>Use UIHtmlErrorLogger in MATLAB to capture errors</li>
+                <li>Click the buttons below to test error reporting</li>
+                <li>Errors will appear in your MATLAB command window</li>
+            </ol>
+        </div>
+
+        <div class="status" id="status">
+            <strong>Status:</strong> Error rerouter script loaded successfully
+        </div>
+
+        <div class="button-group">
+            <h3>Test Buttons:</h3>
+            <button onclick="testNormalFunction()">Normal Function Call</button>
+            <button onclick="testConsoleLog()">Console Log (Info)</button>
+            <button onclick="testConsoleWarn()">Console Warning</button>
+            <button class="error-button" onclick="testConsoleError()">Console Error</button>
+            <button class="error-button" onclick="testUndefinedVariable()">Undefined Variable Error</button>
+            <button class="error-button" onclick="testTypeError()">Type Error</button>
+            <button class="error-button" onclick="triggerSyntaxError()">Runtime Error</button>
+        </div>
+
+        <div id="output">
+            <h3>Output Log:</h3>
+            <div id="logOutput" style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 100px; font-family: monospace; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <!-- Include the UIHtml error rerouter script -->
+    <script src="../js/uihtml-error-rerouter.js"></script>
+
+    <script>
+        // Example functions to test error reporting
+        
+        function testNormalFunction() {
+            console.log('Normal function executed successfully');
+            addToLog('✓ Normal function executed');
+        }
+
+        function testConsoleLog() {
+            console.log('This is a console.log message');
+            addToLog('ℹ Console.log message sent');
+        }
+
+        function testConsoleWarn() {
+            console.warn('This is a console warning');
+            addToLog('⚠ Console warning sent');
+        }
+
+        function testConsoleError() {
+            console.error('This is a test console error message');
+            addToLog('❌ Console error sent to MATLAB');
+        }
+
+        function testUndefinedVariable() {
+            try {
+                // This will cause a ReferenceError
+                console.log(undefinedVariable);
+            } catch (e) {
+                console.error('Caught undefined variable error:', e.message);
+                addToLog('❌ Undefined variable error sent to MATLAB');
+            }
+        }
+
+        function testTypeError() {
+            try {
+                // This will cause a TypeError
+                var nullValue = null;
+                nullValue.someProperty.anotherProperty;
+            } catch (e) {
+                console.error('Caught type error:', e.message);
+                addToLog('❌ Type error sent to MATLAB');
+            }
+        }
+
+        function triggerSyntaxError() {
+            try {
+                // Simulate a runtime error
+                throw new Error('Simulated runtime error for testing');
+            } catch (e) {
+                console.error('Runtime error:', e.message);
+                addToLog('❌ Runtime error sent to MATLAB');
+            }
+        }
+
+        function addToLog(message) {
+            var logOutput = document.getElementById('logOutput');
+            var timestamp = new Date().toLocaleTimeString();
+            logOutput.innerHTML += '<div>[' + timestamp + '] ' + message + '</div>';
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+
+        // Add a message when page loads
+        window.addEventListener('load', function() {
+            addToLog('✓ Demo page loaded successfully');
+            addToLog('✓ UIHtml error rerouter script active');
+        });
+    </script>
+</body>
+</html>

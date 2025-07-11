@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal Example</title>
+</head>
+<body>
+    <h1>Minimal UIHtml Error Debugger Example</h1>
+    
+    <p>This is a minimal example showing the two-step process:</p>
+    <ol>
+        <li>✓ Include the error rerouting script (see script tag below)</li>
+        <li>✓ Attach debugger class in MATLAB (see minimal_example.m)</li>
+    </ol>
+    
+    <button onclick="console.error('Test error message')">Click to trigger error</button>
+    <button onclick="console.log('Normal message')">Normal button</button>
+    
+    <!-- Step 1: Include the error rerouting script -->
+    <script src="../js/uihtml-error-rerouter.js"></script>
+</body>
+</html>
