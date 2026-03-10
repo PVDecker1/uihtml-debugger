@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Console Error Rerouter Example</title>
+    <script>
+        // Inline consoleShim.js
+        (function() {
+            var originalConsole = {
+                error: console.error,
+                warn: console.warn,
+                info: console.info,
+                log: console.log
+            };
+
+            function sendToMatlab(level, args) {
+                var message = Array.prototype.map.call(args, function(arg) {
+                    if (arg instanceof Error) {
+                        return arg.message;
+                    } else if (typeof arg === 'object') {
+                        try {
+                            return JSON.stringify(arg);
+                        } catch (e) {
+                            return String(arg);
+                        }
+                    } else {
+                        return String(arg);
+                    }
+                }).join(' ');
+
+                var stack = '';
+                if (args[0] instanceof Error && args[0].stack) {
+                    stack = args[0].stack;
+                } else {
+                    try {
+                        throw new Error();
+                    } catch (e) {
+                        if (e.stack) {
+                            stack = e.stack;
+                        }
+                    }
+                }
+
+                if (window.sendEventToMATLAB) {
+                    window.sendEventToMATLAB("ConsoleError", {
+                        level: level,
+                        message: message,
+                        stack: stack
+                    });
+                }
+            }
+
+            console.error = function() {
+                sendToMatlab('error', arguments);
+                if (originalConsole.error) {
+                    originalConsole.error.apply(console, arguments);
+                }
+            };
+
+            console.warn = function() {
+                sendToMatlab('warn', arguments);
+                if (originalConsole.warn) {
+                    originalConsole.warn.apply(console, arguments);
+                }
+            };
+
+            console.info = function() {
+                sendToMatlab('info', arguments);
+                if (originalConsole.info) {
+                    originalConsole.info.apply(console, arguments);
+                }
+            };
+
+            console.log = function() {
+                sendToMatlab('log', arguments);
+                if (originalConsole.log) {
+                    originalConsole.log.apply(console, arguments);
+                }
+            };
+        })();
+    </script>
+</head>
+<body>
+    <h2>Console Error Rerouter Example</h2>
+    <p>Click the buttons below to generate console errors.</p>
+    <button onclick="triggerError()">Trigger console.error</button>
+    <button onclick="triggerWarn()">Trigger console.warn</button>
+    <button onclick="triggerInfo()">Trigger console.info</button>
+
+    <script>
+        function triggerError() {
+            console.error("This is a test error from JavaScript!");
+        }
+
+        function triggerWarn() {
+            console.warn("This is a test warning from JavaScript!");
+        }
+
+        function triggerInfo() {
+            console.info("This is a test info message from JavaScript!");
+        }
+    </script>
+</body>
+</html>
