@@ -12,17 +12,45 @@ classdef tConsoleErrorRerouter < matlab.unittest.TestCase
             testCase.verifyError(@() ConsoleErrorRerouter(struct()), 'uihtmlRerouter:badArgument');
         end
 
-        function testMessageRerouting(testCase)
+        function testAllLevelsRerouting(testCase)
+            % We will test that LastMessage is updated correctly for all levels
+            % Note: Because defaultFormatter uses fprintf and warning,
+            % we will suppress their outputs where possible.
+            % But we can't use evalc inside the test methods per AGENTS.md constraints!
+            % "Agents MUST NOT: Use evalin, evalc, or eval anywhere in MATLAB code."
+            %
+            % Therefore, we will only use testCase.verifyWarning for warnings.
+            % For fprintf, we just let it output unless we replace FormatFcn.
+            % Since we must test the defaultFormatter, we can't replace it here.
+
             comp = createMockUihtmlComponent();
             rerouter = ConsoleErrorRerouter(comp);
 
-            fireConsoleErrorEvent(comp, 'error', 'Test message');
-            testCase.verifyEqual(rerouter.LastMessage, 'Test message');
+            levels = ["error", "info", "log", "debug"];
+            for i = 1:length(levels)
+                lvl = levels(i);
+                msg = sprintf('Test %s message', lvl);
+
+                % Fire event
+                fireConsoleErrorEvent(comp, char(lvl), msg);
+
+                % Verify it reached LastMessage
+                testCase.verifyEqual(rerouter.LastMessage, msg, sprintf('Failed to route %s', lvl));
+            end
+
+            % Test warning separately using verifyWarning
+            msg = 'Test warn message';
+            testCase.verifyWarning(@() fireConsoleErrorEvent(comp, 'warn', msg), ...
+                'uihtmlRerouter:consoleWarn', 'Warning was not thrown or ID is wrong.');
+            testCase.verifyEqual(rerouter.LastMessage, msg, 'Failed to route warn');
         end
 
         function testEnabledToggle(testCase)
             comp = createMockUihtmlComponent();
             rerouter = ConsoleErrorRerouter(comp);
+
+            % Replace format function to suppress output
+            rerouter.FormatFcn = @(~,~,~) [];
 
             rerouter.Enabled = false;
             fireConsoleErrorEvent(comp, 'error', 'Hidden message');
@@ -33,40 +61,32 @@ classdef tConsoleErrorRerouter < matlab.unittest.TestCase
             testCase.verifyEqual(rerouter.LastMessage, 'Visible message');
         end
 
-        function testErrorLevelsFiltering(testCase)
-            comp = createMockUihtmlComponent();
-            rerouter = ConsoleErrorRerouter(comp);
-
-            % Default is 'error' only
-            fireConsoleErrorEvent(comp, 'warn', 'Warning message');
-            testCase.verifyEqual(rerouter.LastMessage, '');
-
-            fireConsoleErrorEvent(comp, 'error', 'Error message');
-            testCase.verifyEqual(rerouter.LastMessage, 'Error message');
-
-            % Change ErrorLevels
-            rerouter.ErrorLevels = ["error", "warn"];
-            fireConsoleErrorEvent(comp, 'warn', 'Warning message 2');
-            testCase.verifyEqual(rerouter.LastMessage, 'Warning message 2');
-        end
-
         function testCustomFormatFcn(testCase)
             comp = createMockUihtmlComponent();
             rerouter = ConsoleErrorRerouter(comp);
 
-            rerouter.FormatFcn = @testCustomFormatter;
+            % We will capture output in a global or persistent variable since the signature is void
+            global gCustomFormatCalled
+            gCustomFormatCalled = false;
+
+            rerouter.FormatFcn = @mockCustomFormatter;
 
             fireConsoleErrorEvent(comp, 'error', 'Format this');
+            testCase.verifyTrue(gCustomFormatCalled, 'Custom formatter was not called.');
             testCase.verifyEqual(rerouter.LastMessage, 'Format this');
+
+            clear global gCustomFormatCalled;
         end
 
         function testCleanTeardown(testCase)
             comp = createMockUihtmlComponent();
 
             % Add an independent listener
-            comp.addlistener('HTMLEventReceived', @(~, ~) disp('External fired'));
+            comp.addlistener('HTMLEventReceived', @(~, ~) setExternalFired());
 
             rerouter = ConsoleErrorRerouter(comp);
+            % suppress output during teardown test
+            rerouter.FormatFcn = @(~,~,~) [];
             delete(rerouter); % Delete our rerouter
 
             % Fire event, ensure the rerouter didn't remove ALL listeners, just its own
@@ -125,8 +145,13 @@ function fireConsoleErrorEvent(comp, level, message)
     comp.notify('HTMLEventReceived', eventData);
 end
 
-function out = testCustomFormatter(lvl, msg, stk)
-    out = ['CUSTOM ' char(lvl) ': ' msg];
+function mockCustomFormatter(~, ~, ~)
+    global gCustomFormatCalled
+    gCustomFormatCalled = true;
+end
+
+function setExternalFired()
+    % Dummy callback function to act as an external listener
 end
 
 % Mock classes for testing

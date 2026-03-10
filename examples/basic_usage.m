@@ -13,12 +13,9 @@ filePath = fullfile(fileparts(mfilename('fullpath')), 'html', 'example_page.html
 htmlComp.HTMLSource = filePath;
 
 % Create the rerouter, attaching it to the component.
-% By default, it intercepts 'error' messages and outputs them to the
-% Command Window.
+% It intercepts 'error', 'warn', 'info', 'log', and 'debug' messages
+% and outputs them to the Command Window natively.
 rerouter = ConsoleErrorRerouter(htmlComp);
-
-% Optionally, extend the intercepted error levels to include warnings and info:
-rerouter.ErrorLevels = ["error", "warn", "info"];
 
 disp('UI figure created. Click the buttons in the UI to generate console messages.');
 disp('Check the MATLAB Command Window for the rerouted output.');

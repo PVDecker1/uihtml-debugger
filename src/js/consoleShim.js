@@ -3,7 +3,8 @@
         error: console.error,
         warn: console.warn,
         info: console.info,
-        log: console.log
+        log: console.log,
+        debug: console.debug
     };
 
     function sendToMatlab(level, args) {
@@ -68,6 +69,13 @@
         sendToMatlab('log', arguments);
         if (originalConsole.log) {
             originalConsole.log.apply(console, arguments);
+        }
+    };
+
+    console.debug = function() {
+        sendToMatlab('debug', arguments);
+        if (originalConsole.debug) {
+            originalConsole.debug.apply(console, arguments);
         }
     };
 })();

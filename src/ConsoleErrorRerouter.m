@@ -8,10 +8,7 @@ classdef ConsoleErrorRerouter < handle
         % Toggles rerouting on/off without destroying the object. Default: true.
         Enabled (1,1) logical = true
 
-        % Console levels to intercept. Default: ["error"]. Allowed: "error", "warn", "info", "log".
-        ErrorLevels (1,:) string {mustBeMember(ErrorLevels, ["error", "warn", "info", "log"])} = ["error"]
-
-        % Custom formatter f(level, message, stack) -> char. Default: built-in red-text formatter using fprintf.
+        % Custom formatter f(level, message, stack) -> void. Default: built-in formatter.
         FormatFcn (1,1) function_handle = @ConsoleErrorRerouter.defaultFormatter
     end
 
@@ -205,29 +202,21 @@ classdef ConsoleErrorRerouter < handle
                 return; % Not the expected format
             end
 
-            if ~ismember(level, obj.ErrorLevels)
-                return;
-            end
-
             obj.LastMessage = message;
 
             % Format and output
-            formattedOutput = obj.FormatFcn(level, message, stack);
-            if ~isempty(formattedOutput)
-                if level == "error"
-                    fprintf(2, '%s\n', formattedOutput);
-                else
-                    fprintf('%s\n', formattedOutput);
-                end
-            end
+            obj.FormatFcn(level, message, stack);
         end
     end
 
     methods (Static, Access = private)
-        function out = defaultFormatter(level, message, stack)
-            out = sprintf('Console %s: %s', upper(level), message);
-            if ~isempty(stack)
-                out = sprintf('%s\nStack Trace:\n%s', out, stack);
+        function defaultFormatter(level, message, ~)
+            if level == "error"
+                fprintf(2, '[JS error] %s\n', message);
+            elseif level == "warn"
+                warning('uihtmlRerouter:consoleWarn', '[JS warn] %s', message);
+            else
+                fprintf(1, '[JS %s] %s\n', char(level), message);
             end
         end
     end
