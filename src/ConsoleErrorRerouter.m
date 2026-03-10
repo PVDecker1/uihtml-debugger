@@ -23,6 +23,9 @@ classdef ConsoleErrorRerouter < handle
     properties (Access = private)
         HtmlComponent
         EventListener
+        OriginalHTMLSource char = ''
+        CopiedShimPath char = ''
+        TempHTMLPath char = ''
     end
 
     methods
@@ -44,6 +47,11 @@ classdef ConsoleErrorRerouter < handle
             else
                 error('uihtmlRerouter:badArgument', 'Provided component must be a matlab.ui.control.HTML object.');
             end
+
+            % Handle shim delivery if HTMLSource is provided
+            if isprop(uihtmlComp, 'HTMLSource') && ~isempty(char(uihtmlComp.HTMLSource))
+                obj.injectShim();
+            end
         end
 
         function delete(obj)
@@ -51,10 +59,121 @@ classdef ConsoleErrorRerouter < handle
             if ~isempty(obj.EventListener) && isvalid(obj.EventListener)
                 delete(obj.EventListener);
             end
+
+            % Cleanup shim delivery
+            obj.removeShim();
         end
     end
 
     methods (Access = private)
+        function injectShim(obj)
+            source = char(obj.HtmlComponent.HTMLSource);
+            obj.OriginalHTMLSource = source;
+
+            % If it's a URL, we cannot inject the shim by file copying.
+            if startsWith(source, 'http://') || startsWith(source, 'https://')
+                return;
+            end
+
+            % Get target directory and original filename
+            [targetDir, name, ext] = fileparts(source);
+            if isempty(targetDir)
+                targetDir = pwd;
+            end
+
+            % Resolve path to consoleShim.js
+            myDir = fileparts(mfilename('fullpath'));
+            shimSrc = fullfile(myDir, 'js', 'consoleShim.js');
+
+            if ~isfile(shimSrc)
+                return;
+            end
+
+            % Copy shim to target directory
+            obj.CopiedShimPath = fullfile(targetDir, 'consoleShim.js');
+            try
+                % Avoid copying over itself if already there
+                if ~strcmp(shimSrc, obj.CopiedShimPath)
+                    copyfile(shimSrc, obj.CopiedShimPath, 'f');
+                end
+            catch
+                % Cannot copy, return early
+                obj.CopiedShimPath = '';
+                return;
+            end
+
+            % Read original HTML
+            try
+                fid = fopen(source, 'r', 'n', 'utf-8');
+                if fid == -1
+                    return;
+                end
+                htmlContent = fread(fid, '*char')';
+                fclose(fid);
+            catch
+                return;
+            end
+
+            % Prepend script tag
+            scriptTag = '<script src="consoleShim.js"></script>';
+
+            % Try to find <head>
+            [startIdx, endIdx] = regexpi(htmlContent, '<head[^>]*>');
+            if ~isempty(endIdx)
+                insertPos = endIdx(1);
+                newHtml = [htmlContent(1:insertPos), newline, scriptTag, newline, htmlContent(insertPos+1:end)];
+            else
+                % Try to find <html>
+                [startIdx, endIdx] = regexpi(htmlContent, '<html[^>]*>');
+                if ~isempty(endIdx)
+                    insertPos = endIdx(1);
+                    newHtml = [htmlContent(1:insertPos), newline, '<head>', scriptTag, '</head>', newline, htmlContent(insertPos+1:end)];
+                else
+                    newHtml = [scriptTag, newline, htmlContent];
+                end
+            end
+
+            % Write injected HTML to a temporary file in the same directory
+            obj.TempHTMLPath = fullfile(targetDir, [name, '_rerouter_temp', ext]);
+            try
+                fid = fopen(obj.TempHTMLPath, 'w', 'n', 'utf-8');
+                if fid == -1
+                    return;
+                end
+                fwrite(fid, newHtml, 'char');
+                fclose(fid);
+            catch
+                obj.TempHTMLPath = '';
+                return;
+            end
+
+            % Update the component's HTMLSource with the temporary file path.
+            obj.HtmlComponent.HTMLSource = obj.TempHTMLPath;
+        end
+
+        function removeShim(obj)
+            % Restore original HTMLSource property
+            if isvalid(obj.HtmlComponent) && ~isempty(obj.OriginalHTMLSource)
+                obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+            end
+
+            % Delete copied shim file
+            if ~isempty(obj.CopiedShimPath) && isfile(obj.CopiedShimPath)
+                try
+                    delete(obj.CopiedShimPath);
+                catch
+                end
+            end
+
+            % Delete temporary HTML file
+            if ~isempty(obj.TempHTMLPath) && isfile(obj.TempHTMLPath)
+                try
+                    delete(obj.TempHTMLPath);
+                catch
+                end
+            end
+        end
+
         function onHTMLEventReceived(obj, ~, eventData)
             if ~obj.Enabled
                 return;

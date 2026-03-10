@@ -58,9 +58,6 @@ classdef tConsoleErrorRerouter < matlab.unittest.TestCase
 
             fireConsoleErrorEvent(comp, 'error', 'Format this');
             testCase.verifyEqual(rerouter.LastMessage, 'Format this');
-
-            % Nested helper within testCustomFormatFcn was breaking the test structure.
-            % But wait, matlab handles nested functions differently. I'll just remove the verification of output in unit test since it writes to command window. The LastMessage is what I'll verify.
         end
 
         function testCleanTeardown(testCase)
@@ -74,8 +71,46 @@ classdef tConsoleErrorRerouter < matlab.unittest.TestCase
 
             % Fire event, ensure the rerouter didn't remove ALL listeners, just its own
             fireConsoleErrorEvent(comp, 'error', 'Test after teardown');
+        end
 
-            % The test should just pass without error. We're testing delete doesn't crash or kill other listeners.
+        function testShimDelivery(testCase)
+            import matlab.unittest.fixtures.TemporaryFolderFixture
+            tempFixture = testCase.applyFixture(TemporaryFolderFixture);
+
+            % Create a dummy HTML file
+            htmlFile = fullfile(tempFixture.Folder, 'test_shim.html');
+            fid = fopen(htmlFile, 'w');
+            fwrite(fid, '<html><head><title>Test</title></head><body></body></html>');
+            fclose(fid);
+
+            comp = createMockUihtmlComponent();
+            comp.HTMLSource = htmlFile;
+
+            rerouter = ConsoleErrorRerouter(comp);
+
+            % Verify shim was copied
+            copiedShimPath = fullfile(tempFixture.Folder, 'consoleShim.js');
+            testCase.verifyTrue(isfile(copiedShimPath), 'consoleShim.js should be copied to HTML directory.');
+
+            % Verify HTMLSource was updated to a temporary file
+            testCase.verifyNotEqual(comp.HTMLSource, htmlFile, 'HTMLSource should be updated.');
+            testCase.verifySubstring(comp.HTMLSource, '_rerouter_temp', 'HTMLSource should point to a temporary file.');
+            testCase.verifyTrue(isfile(comp.HTMLSource), 'The temporary HTML file should exist.');
+
+            % Read the temporary HTML to verify script injection
+            fid = fopen(comp.HTMLSource, 'r');
+            tempHtmlContent = fread(fid, '*char')';
+            fclose(fid);
+            testCase.verifySubstring(tempHtmlContent, '<script src="consoleShim.js"></script>', 'Script tag should be injected.');
+
+            % Save the temporary file path for cleanup verification
+            tempHtmlFile = comp.HTMLSource;
+
+            % Verify Teardown
+            delete(rerouter);
+            testCase.verifyFalse(isfile(copiedShimPath), 'consoleShim.js should be deleted on destruction.');
+            testCase.verifyFalse(isfile(tempHtmlFile), 'Temporary HTML file should be deleted on destruction.');
+            testCase.verifyEqual(comp.HTMLSource, htmlFile, 'Original HTMLSource should be restored on destruction.');
         end
     end
 end
@@ -101,6 +136,7 @@ classdef MockUihtmlComponent < handle
     end
     properties
         HTMLEventReceivedFcn
+        HTMLSource = ''
     end
 end
 
