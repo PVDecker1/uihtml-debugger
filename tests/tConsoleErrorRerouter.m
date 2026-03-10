@@ -135,7 +135,7 @@ classdef tConsoleErrorRerouter < matlab.unittest.TestCase
     end
 end
 
-% Helper functions (simulating what AGENTS.md mentioned)
+% Helper functions
 function comp = createMockUihtmlComponent()
     comp = MockUihtmlComponent();
 end
@@ -152,28 +152,4 @@ end
 
 function setExternalFired()
     % Dummy callback function to act as an external listener
-end
-
-% Mock classes for testing
-classdef MockUihtmlComponent < handle
-    events
-        HTMLEventReceived
-    end
-    properties
-        HTMLEventReceivedFcn
-        HTMLSource = ''
-    end
-end
-
-classdef MockHTMLEventData < event.EventData
-    properties
-        HTMLEventName = 'ConsoleError'
-        HTMLEventData
-    end
-
-    methods
-        function obj = MockHTMLEventData(level, message, stack)
-            obj.HTMLEventData = struct('level', level, 'message', message, 'stack', stack);
-        end
-    end
 end
