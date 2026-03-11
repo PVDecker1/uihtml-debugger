@@ -6,6 +6,7 @@ filePath = fullfile(fileparts(mfilename('fullpath')), 'html', 'example_page.html
 htmlComp.HTMLSource = filePath;
 
 rerouter = ConsoleErrorRerouter(htmlComp);
+rerouter.ErrorLevels = ["error", "warn", "info", "log", "debug"];
 
 % Override the default FormatFcn with a custom function.
 % The custom function must accept (level, message, stack) and return void.

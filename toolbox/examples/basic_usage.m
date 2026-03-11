@@ -16,6 +16,7 @@ htmlComp.HTMLSource = filePath;
 % It intercepts 'error', 'warn', 'info', 'log', and 'debug' messages
 % and outputs them to the Command Window natively.
 rerouter = ConsoleErrorRerouter(htmlComp);
+rerouter.ErrorLevels = ["error", "warn", "info", "log", "debug"];
 
 disp('UI figure created. Click the buttons in the UI to generate console messages.');
 disp('Check the MATLAB Command Window for the rerouted output.');

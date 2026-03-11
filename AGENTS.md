@@ -32,21 +32,19 @@ uihtml-console-rerouter/
 ├── README.md
 ├── LICENSE
 │
-├── src/
-│   ├── ConsoleErrorRerouter.m  ← main MATLAB class
-│   └── js/
-│       └── consoleShim.js      ← JavaScript error interceptor snippet
+├── toolbox/                    ← packageable toolbox content
+│   ├── ConsoleErrorRerouter.m  ← main MATLAB class (includes inlined shim)
+│   ├── Contents.m              ← toolbox summary for 'help'
+│   └── examples/
+│       ├── basic_usage.m       ← minimal working example
+│       ├── custom_formatting.m ← example using formatting options
+│       └── html/
+│           └── example_page.html
 │
-├── examples/
-│   ├── basic_usage.m           ← minimal working example
-│   ├── custom_formatting.m     ← example using formatting options
-│   └── html/
-│       └── example_page.html   ← sample HTML file used by examples
-│
-└── tests/
-    ├── tConsoleErrorRerouter.m ← MATLAB unit tests (matlab.unittest)
+└── tests/                      ← unit tests (infrastructure)
+    ├── tConsoleErrorRerouter.m
     └── html/
-        └── test_page.html      ← HTML fixture used by tests
+        └── test_page.html
 ```
 
 ---
@@ -72,21 +70,22 @@ uihtml-console-rerouter/
   [uihtml docs page](https://www.mathworks.com/help/matlab/ref/uihtml.html)).
   Do not use language features introduced after R2023a without a version guard.
 
-### JavaScript
+### JavaScript (Inlined Shim)
 - **ES5 compatible** — the embedded browser in older MATLAB releases may not
   support ES6+ syntax. Use `var`, not `let`/`const`. Use function declarations,
   not arrow functions.
-- Keep `consoleShim.js` self-contained with no external dependencies.
-- The shim must call `window.sendEventToMATLAB` using the reserved event name
-  `"ConsoleError"` and pass a plain object `{ level, message, stack }`.
+- The shim must be self-contained and is injected into the HTML as a `<script>`
+  block during construction of `ConsoleErrorRerouter`.
+- The shim must call `htmlComponent.sendEventToMATLAB` using the reserved event
+  name `"ConsoleError"` and pass a plain object `{ level, message, stack }`.
 - Do not rename or repurpose the `"ConsoleError"` event name — the MATLAB class
   filters on this string.
 
 ### HTML examples / fixtures
 - Keep example HTML files minimal — their purpose is to demonstrate the shim, not
   showcase web design.
-- Include the shim via an inline `<script>` block, not a separate file reference,
-  so the HTML is self-contained.
+- **Requirement**: Every HTML file must define a global `setup(htmlComponent)`
+  function for the shim to correctly hook into the bidirectional communication bridge.
 
 ---
 
@@ -98,7 +97,7 @@ uihtml-console-rerouter/
 |---|---|---|
 | `ConsoleErrorRerouter(uihtmlComp)` | Constructor | Accepts a `matlab.ui.control.HTML` object. Registers the internal `HTMLEventReceived` callback. |
 | `Enabled` | Property (`logical`) | Toggles rerouting on/off without destroying the object. Default: `true`. |
-| `ErrorLevels` | Property (`string` array) | Console levels to intercept. Default: `["error"]`. Allowed: `"error"`, `"warn"`, `"info"`, `"log"`. |
+| `ErrorLevels` | Property (`string` array) | Console levels to intercept. Default: `["error"]`. Allowed: `"error"`, `"warn"`, `"info"`, `"log"`, `"debug"`. |
 | `FormatFcn` | Property (`function_handle`) | Custom formatter `f(level, message, stack) → char`. Default: built-in red-text formatter using `fprintf`. |
 | `delete()` | Destructor | Unregisters only the rerouter's listener; preserves any other `HTMLEventReceived` listeners on the component. |
 
@@ -132,7 +131,8 @@ uihtml-console-rerouter/
 - Introduce any new MATLAB toolbox dependency (the tool must run on MATLAB base
   with no additional toolboxes).
 - Use `evalin`, `evalc`, or `eval` anywhere in MATLAB code.
-- Modify `consoleShim.js` to use ES6+ syntax without a compatibility gate.
+- Modify the inlined shim logic in `ConsoleErrorRerouter.m` to use ES6+ syntax
+  without a compatibility gate.
 - Remove or rename any public property or method listed in the Key Interfaces table.
 - Add files outside the directory structure defined above without updating this
   AGENTS.md and the README.

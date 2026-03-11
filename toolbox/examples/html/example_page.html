@@ -12,6 +12,11 @@
     <button onclick="triggerInfo()">Trigger console.info</button>
 
     <script>
+        // Standard MATLAB UIHTML setup function
+        function setup(htmlComponent) {
+            console.log("UIHTML application ready.");
+        }
+
         function triggerError() {
             console.error("This is a test error from JavaScript!");
         }

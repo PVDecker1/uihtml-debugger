@@ -4,6 +4,6 @@ classdef MockUihtmlComponent < handle
     end
     properties
         HTMLEventReceivedFcn
-        HTMLSource = ''
+        HTMLSource string = ""
     end
 end

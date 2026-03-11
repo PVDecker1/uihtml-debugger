@@ -7,6 +7,11 @@
 <body>
     <div id="status">Ready</div>
     <script>
+        // Standard MATLAB UIHTML setup function
+        function setup(htmlComponent) {
+            console.log("Test Page Ready.");
+        }
+
         function triggerTestError(msg) {
             console.error(msg || "Test Error");
         }
@@ -16,20 +21,6 @@
         function triggerTestInfo(msg) {
             console.info(msg || "Test Info");
         }
-        function setupMatlabCallback() {
-            if (window.setupMATLABCallback) {
-                window.setupMATLABCallback(function(data) {
-                    if (data && data.action) {
-                        switch(data.action) {
-                            case 'error': triggerTestError(data.message); break;
-                            case 'warn': triggerTestWarn(data.message); break;
-                            case 'info': triggerTestInfo(data.message); break;
-                        }
-                    }
-                });
-            }
-        }
-        setupMatlabCallback();
     </script>
 </body>
 </html>
