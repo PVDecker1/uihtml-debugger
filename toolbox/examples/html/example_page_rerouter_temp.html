@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Console Error Rerouter Example</title>
+</head>
+<body>
+    <h2>Console Error Rerouter Example</h2>
+    <p>Click the buttons below to generate console errors.</p>
+    <button onclick="triggerError()">Trigger console.error</button>
+    <button onclick="triggerWarn()">Trigger console.warn</button>
+    <button onclick="triggerInfo()">Trigger console.info</button>
+
+    <script>
+        // Standard MATLAB UIHTML setup function
+        function setup(htmlComponent) {
+            console.log("UIHTML application ready.");
+        }
+
+        function triggerError() {
+            console.error("This is a test error from JavaScript!");
+        }
+
+        function triggerWarn() {
+            console.warn("This is a test warning from JavaScript!");
+        }
+
+        function triggerInfo() {
+            console.info("This is a test info message from JavaScript!");
+        }
+    </script>
+
+<script id="console-rerouter-shim">
+(function() {
+    var _userSetup = (typeof setup === 'function') ? setup : null;
+    setup = function(htmlComponent) {
+        var levels = ['error', 'warn', 'log', 'info', 'debug'];
+        levels.forEach(function(level) {
+            var _orig = console[level];
+            console[level] = function() {
+                var args = Array.prototype.slice.call(arguments);
+                var message = args.map(function(a) {
+                    if (a instanceof Error) return a.message;
+                    if (typeof a === 'object') { try { return JSON.stringify(a); } catch(e) { return String(a); } }
+                    return String(a);
+                }).join(' ');
+                var stack = (args[0] instanceof Error && args[0].stack) ? args[0].stack : '';
+                htmlComponent.sendEventToMATLAB('ConsoleError', { level: level, message: message, stack: stack });
+                if (typeof _orig === 'function') { _orig.apply(console, arguments); }
+            };
+        });
+        if (_userSetup) { _userSetup(htmlComponent); }
+    };
+})();
+</script>
+</body>
+</html>

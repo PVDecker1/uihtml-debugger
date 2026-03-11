@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Console Error Rerouter Example</title>
+</head>
+<body>
+    <h2>Console Error Rerouter Example</h2>
+    <p>Click the buttons below to generate console errors.</p>
+    <button onclick="triggerError()">Trigger console.error</button>
+    <button onclick="triggerWarn()">Trigger console.warn</button>
+    <button onclick="triggerInfo()">Trigger console.info</button>
+
+    <script>
+        // Standard MATLAB UIHTML setup function
+        function setup(htmlComponent) {
+            console.log("UIHTML application ready.");
+        }
+
+        function triggerError() {
+            console.error("This is a test error from JavaScript!");
+        }
+
+        function triggerWarn() {
+            console.warn("This is a test warning from JavaScript!");
+        }
+
+        function triggerInfo() {
+            console.info("This is a test info message from JavaScript!");
+        }
+    </script>
+</body>
+</html>
