@@ -38,3 +38,6 @@ codegen/
 # SimBiology backup files
 *.sbproj.backup
 *.sbproj.bak
+
+# Temp files not cleanup up
+*_rerouter_temp.html

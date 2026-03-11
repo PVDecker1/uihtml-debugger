@@ -14,12 +14,29 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Start virtual display server
+        run: |
+          sudo apt-get install -y xvfb
+          Xvfb :99 &
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
 
       - name: Run tests
         uses: matlab-actions/run-tests@v2
         with:
-          source-folder: toolbox
-          select-by-folder: tests
-          test-results-junit: test-results.xml
+            source-folder: toolbox
+            test-results-junit: test-results.xml
+            code-coverage-cobertura: code-coverage/coverage.xml
+            test-results-html: test-results
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+            name: test-artifacts
+            path: |
+                test-results.xml
+                test-results/
+                code-coverage/
