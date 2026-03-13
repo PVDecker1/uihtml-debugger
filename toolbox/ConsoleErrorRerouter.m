@@ -201,4 +201,4 @@ classdef ConsoleErrorRerouter < handle
             end
         end % function defaultFormatter
     end % methods (Static, Access = private)
-end % classdef ConsoleErrorRerouter < handle
+end % classdef ConsoleErrorRerouter

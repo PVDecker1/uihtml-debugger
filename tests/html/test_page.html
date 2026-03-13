@@ -10,6 +10,18 @@
         // Standard MATLAB UIHTML setup function
         function setup(htmlComponent) {
             console.log("Test Page Ready.");
+            // Send a custom event so MATLAB knows we are ready
+            htmlComponent.sendEventToMATLAB("Ready", {});
+
+            // Listen for the event sent from MATLAB
+            htmlComponent.addEventListener("triggerTest", function(event) {
+                const data = event.Data;
+                triggerTest(data.level, data.msg);
+            });
+        }
+
+        function triggerTest(level, msg) {
+            console[level](msg);
         }
 
         function triggerTestError(msg) {
