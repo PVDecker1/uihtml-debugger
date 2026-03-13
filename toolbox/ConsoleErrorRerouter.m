@@ -10,9 +10,12 @@ classdef ConsoleErrorRerouter < handle
 
         % Console levels to intercept. Default: ["error"].
         % Allowed values: "error", "warn", "info", "log", "debug".
-        ErrorLevels (1,:) string = ["error"]
+        ErrorLevels (1,:) string {mustBeMember(ErrorLevels, ...
+            ["error","warn","info","log","debug"])} = ["error"]
 
-        % Custom formatter f(level, message, stack) -> void. Default: built-in formatter.
+        % Custom format function.
+        % Function signature: f(level, message, stack).
+        % Default: built-in formatter.
         FormatFcn (1,1) function_handle = @ConsoleErrorRerouter.defaultFormatter
     end
 
@@ -39,42 +42,30 @@ classdef ConsoleErrorRerouter < handle
             %   obj = ConsoleErrorRerouter(uihtmlComp) attaches the rerouter to 
             %   the provided uihtml component.
             arguments
-                uihtmlComp (1,1)
+                uihtmlComp (1,1) matlab.ui.control.HTML
             end
 
             obj.HtmlComponent = uihtmlComp;
 
             % Use addlistener to catch events. This doesn't clobber HTMLEventReceivedFcn.
-            try
-                obj.EventListener = addlistener(uihtmlComp, "HTMLEventReceived", ...
+            obj.EventListener = listener(uihtmlComp, "HTMLEventReceived", ...
                     @(src, event) obj.onHTMLEventReceived(src, event));
-            catch
-                % Fallback: Check if it's a real uihtml component
-                if ~isprop(uihtmlComp, "HTMLEventReceivedFcn") && ...
-                        ~isprop(uihtmlComp, "HTMLSource")
-                    error("uihtmlRerouter:badArgument", ...
-                        "Provided component must be a matlab.ui.control.HTML object.");
-                end
-            end
 
             % Handle shim delivery if HTMLSource is provided
-            if isprop(uihtmlComp, "HTMLSource") && ~isempty(string(uihtmlComp.HTMLSource))
+            if ~isempty(string(uihtmlComp.HTMLSource))
                 obj.injectShim();
             end
-        end
+        end % Constructor
 
         function delete(obj)
             % delete Destructor
             %
-            %   Cleans up listeners and temporary files.
-            if ~isempty(obj.EventListener) && isvalid(obj.EventListener)
-                delete(obj.EventListener);
-            end
+            %   Cleans up temporary files.
 
             % Cleanup shim delivery
             obj.removeShim();
-        end
-    end
+        end % function delete
+    end % methods
 
     methods (Access = private)
         function injectShim(obj)
@@ -84,49 +75,23 @@ classdef ConsoleErrorRerouter < handle
 
             % If it's a URL, we cannot inject the shim by file modification.
             if startsWith(source, "http://") || startsWith(source, "https://")
-                return;
+                error("ConsoleErrorRerouter:UrlHTMLSource", ...
+                    "URLs are not supported by ConsoleErrorRerouter");
             end
 
             % Read original HTML
-            try
-                fid = fopen(source, "r", "n", "utf-8");
-                if fid == -1
-                    return;
-                end
-                htmlContent = fread(fid, "*char")';
-                fclose(fid);
-            catch
-                return;
+            if isfile(source)
+                htmlContent = fileread(source);
+            else
+                error("ConsoleErrorRerouter:InvalidHTMLSource", ...
+                    "HTML source must be a file.");
             end
 
             % Prepare the shim script block
             % We wrap the existing setup function to capture the htmlComponent.
-            shimScriptLines = [ ...
-                "<script id=""console-rerouter-shim"">" ...
-                "(function() {" ...
-                "    var _userSetup = (typeof setup === 'function') ? setup : null;" ...
-                "    setup = function(htmlComponent) {" ...
-                "        var levels = ['error', 'warn', 'log', 'info', 'debug'];" ...
-                "        levels.forEach(function(level) {" ...
-                "            var _orig = console[level];" ...
-                "            console[level] = function() {" ...
-                "                var args = Array.prototype.slice.call(arguments);" ...
-                "                var message = args.map(function(a) {" ...
-                "                    if (a instanceof Error) return a.message;" ...
-                "                    if (typeof a === 'object') { try { return JSON.stringify(a); } catch(e) { return String(a); } }" ...
-                "                    return String(a);" ...
-                "                }).join(' ');" ...
-                "                var stack = (args[0] instanceof Error && args[0].stack) ? args[0].stack : '';" ...
-                "                htmlComponent.sendEventToMATLAB('ConsoleError', { level: level, message: message, stack: stack });" ...
-                "                if (typeof _orig === 'function') { _orig.apply(console, arguments); }" ...
-                "            };" ...
-                "        });" ...
-                "        if (_userSetup) { _userSetup(htmlComponent); }" ...
-                "    };" ...
-                "})();" ...
-                "</script>" ...
-            ];
-            shimScript = join(shimScriptLines, newline);
+            dSelf = fileparts(mfilename("fullpath"));
+            pShim = fullfile(dSelf,"Support","shim_lines.js");
+            shimScript = fileread(pShim);
 
             % Insert just before </body> or at the end
             [startIdx, ~] = regexpi(htmlContent, "</body>");
@@ -143,32 +108,26 @@ classdef ConsoleErrorRerouter < handle
             if isempty(targetDir)
                 targetDir = pwd;
             end
-            obj.TempHTMLPath = fullfile(targetDir, name + "_rerouter_temp" + ext);
+            [~,uuid] = fileparts(tempname);
+            obj.TempHTMLPath = fullfile(targetDir, name + "_rerouter_" + uuid + ext);
             
             try
-                fid = fopen(obj.TempHTMLPath, "w", "n", "utf-8");
-                if fid == -1
-                    return;
-                end
-                fwrite(fid, newHtml, "char");
-                fclose(fid);
+                writelines(newHtml,obj.TempHTMLPath);
             catch
-                obj.TempHTMLPath = "";
-                return;
+                error("ConsoleErrorRerouter:TempWriteFailure", ...
+                    "Filed to write temporary html file to:\n%s",obj.TempHTMLPath);
             end
 
             % Update the component's HTMLSource with the temporary file path.
+            obj.HtmlComponent.HTMLSource = "";
             obj.HtmlComponent.HTMLSource = obj.TempHTMLPath;
-        end
+        end % function injectShim
 
         function removeShim(obj)
             % removeShim Restores the original HTML and cleans up the temporary file.
-            try
-                if isa(obj.HtmlComponent, "handle") && isvalid(obj.HtmlComponent) && ...
-                        ~isempty(obj.OriginalHTMLSource)
-                    obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
-                end
-            catch
+            if isa(obj.HtmlComponent, "handle") && isvalid(obj.HtmlComponent) && ...
+                    ~isempty(obj.OriginalHTMLSource)
+                obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
             end
 
             % Delete temporary HTML file
@@ -176,9 +135,12 @@ classdef ConsoleErrorRerouter < handle
                 try
                     delete(obj.TempHTMLPath);
                 catch
+                    warning("ConsoleErrorRerouter:FailedCleanup", ...
+                        "Failed to delete %s. Please check your file system", ...
+                        obj.TempHTMLPath)
                 end
             end
-        end
+        end % function removeShim
 
         function onHTMLEventReceived(obj, ~, eventData)
             % onHTMLEventReceived Internal callback for uihtml events.
@@ -187,41 +149,31 @@ classdef ConsoleErrorRerouter < handle
             end
 
             % Standard HTMLEventReceivedData properties: HTMLEventName and HTMLEventData
-            try
-                eventName = string(eventData.HTMLEventName);
-                payload = eventData.HTMLEventData;
-            catch
-                % Fallback for cases where eventData might be structured differently
-                try
-                    eventName = string(eventData.Data.HTMLEventName);
-                    payload = eventData.Data.HTMLEventData;
-                catch
-                    return;
-                end
-            end
+            eventName = string(eventData.HTMLEventName);
+            payload = eventData.HTMLEventData;
 
-            if eventName ~= "ConsoleError"
+            if ~matches(eventName,"ConsoleError")
                 return;
             end
 
             % Extract console message data
             if isstruct(payload) || isobject(payload)
-                try
+                if isfield(payload,"level")
                     level = string(payload.level);
-                    
-                    % Filter based on ErrorLevels
-                    if ~any(level == obj.ErrorLevels)
-                        return;
-                    end
-                    
-                    message = string(payload.message);
-                    if isfield(payload, "stack") || isprop(payload, "stack")
-                        stack = string(payload.stack);
-                    else
-                        stack = "";
-                    end
-                catch
+                else
+                    return
+                end
+
+                % Filter based on ErrorLevels
+                if ~any(matches(level,obj.ErrorLevels))
                     return;
+                end
+
+                message = string(payload.message);
+                if isfield(payload, "stack") || isprop(payload, "stack")
+                    stack = string(payload.stack);
+                else
+                    stack = "";
                 end
             else
                 return;
@@ -231,15 +183,15 @@ classdef ConsoleErrorRerouter < handle
 
             % Format and output
             obj.FormatFcn(level, message, stack);
-        end
-    end
+        end % function onHTMLEventReceived
+    end % methods (Access = private)
 
-    methods (Static, Access = private)
+    methods (Static)
         function defaultFormatter(level, message, ~)
             % defaultFormatter Built-in formatter using fprintf and warning.
-            if level == "error"
+            if matches(level,"error")
                 fprintf(2, "[JS error] %s\n", message);
-            elseif level == "warn"
+            elseif matches(level,"warn")
                 % Backtrace off to avoid confusing the user with internal Rerouter stack
                 state = warning("off", "backtrace");
                 warning("uihtmlRerouter:consoleWarn", "[JS warn] %s", message);
@@ -247,6 +199,6 @@ classdef ConsoleErrorRerouter < handle
             else
                 fprintf(1, "[JS %s] %s\n", char(level), message);
             end
-        end
-    end
-end
+        end % function defaultFormatter
+    end % methods (Static, Access = private)
+end % classdef ConsoleErrorRerouter < handle

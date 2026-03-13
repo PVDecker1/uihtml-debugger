@@ -1,3 +1,4 @@
+function [rerouter,htmlComp] = basic_usage
 % Minimal example demonstrating how to use the ConsoleErrorRerouter.
 
 % Create a UI figure
@@ -18,5 +19,6 @@ htmlComp.HTMLSource = filePath;
 rerouter = ConsoleErrorRerouter(htmlComp);
 rerouter.ErrorLevels = ["error", "warn", "info", "log", "debug"];
 
-disp('UI figure created. Click the buttons in the UI to generate console messages.');
-disp('Check the MATLAB Command Window for the rerouted output.');
+fprintf(1,"UI figure created. Click the buttons in the UI to generate" + ...
+" console messages.\nCheck the MATLAB Command Window for the rerouted output.\n");
+end % function basic_usage
