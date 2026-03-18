@@ -1,0 +1,182 @@
+classdef tUIHTMLDevTools < matlab.unittest.TestCase
+    properties
+        Figure
+        Component
+        FixtureHtml string
+        DevTools
+    end % properties
+
+    methods (TestMethodSetup)
+        function createComponent(testCase)
+            % Create a real uihtml component because matlab.ui.control.HTML
+            % is Sealed and cannot be mocked via createMock.
+            testCase.Figure = uifigure('Visible', 'off');
+            testCase.Component = uihtml(testCase.Figure);
+
+            % Set HTMLSource
+            testFile = which(mfilename);
+            testDir = fileparts(testFile);
+            testCase.FixtureHtml = string(fullfile(testDir, "html", "test_page.html"));
+            testCase.Component.HTMLSource = testCase.FixtureHtml;
+
+            % Ensure cleanup
+            testCase.addTeardown(@() delete(testCase.Figure));
+        end % function createComponent(testCase)
+    end % methods (TestMethodSetup)
+
+    methods (Test)
+        function testConstructorValidComponent(testCase)
+            testCase.DevTools = UIHTMLDevTools(testCase.Component);
+            testCase.verifyClass(testCase.DevTools, "UIHTMLDevTools");
+        end % function testConstructorValidComponent
+
+        function testConstructorInvalidComponent(testCase)
+            testCase.verifyError(@() UIHTMLDevTools(struct()), ...
+                "uihtmlDevTools:InvalidComponent");
+        end % function testConstructorInvalidComponent
+
+        function testConstructorNoSource(testCase)
+            testCase.Component.HTMLSource = "";
+            devTools = UIHTMLDevTools(testCase.Component);
+            testCase.addTeardown(@() delete(devTools));
+            testCase.verifyEqual(string(testCase.Component.HTMLSource), "");
+        end % function testConstructorNoSource
+
+        function testInjection(testCase)
+            devTools = UIHTMLDevTools(testCase.Component);
+            testCase.DevTools = devTools;
+
+            % Temporary HTML file is created
+            testCase.verifyNotEqual(string(testCase.Component.HTMLSource), testCase.FixtureHtml);
+            testCase.verifySubstring(string(testCase.Component.HTMLSource), "_devtools_");
+
+            tempFile = string(testCase.Component.HTMLSource);
+            testCase.verifyTrue(isfile(tempFile));
+
+            % Temp HTML contains eruda.js script tag
+            content = fileread(tempFile);
+            testCase.verifySubstring(content, "<script src=""eruda.js""></script>");
+            testCase.verifySubstring(content, "<script>eruda.init();</script>");
+
+            % Copied eruda.js exists in the HTML file's directory after construction
+            targetDir = fileparts(testCase.FixtureHtml);
+            pErudaDest = fullfile(targetDir, "eruda.js");
+            testCase.verifyTrue(isfile(pErudaDest));
+        end % function testInjection
+
+        function testEnabledToggle(testCase)
+            origHtml = testCase.FixtureHtml;
+            devTools = UIHTMLDevTools(testCase.Component);
+            testCase.DevTools = devTools;
+
+            % Initially enabled/injected
+            tempFile = string(testCase.Component.HTMLSource);
+            testCase.verifyNotEqual(tempFile, string(origHtml));
+            testCase.verifyTrue(isfile(tempFile));
+
+            % Set Enabled to same value
+            devTools.Enabled = true;
+
+            % Disable
+            devTools.Enabled = false;
+            testCase.verifyEqual(string(testCase.Component.HTMLSource), string(origHtml));
+            testCase.verifyFalse(isfile(tempFile));
+
+            % Re-enable
+            devTools.Enabled = true;
+            newTempFile = string(testCase.Component.HTMLSource);
+            testCase.verifyNotEqual(newTempFile, string(origHtml));
+            testCase.verifyTrue(isfile(newTempFile));
+        end % function testEnabledToggle
+
+        function testCleanup(testCase)
+            devTools = UIHTMLDevTools(testCase.Component);
+            testCase.DevTools = devTools;
+
+            tempFile = string(testCase.Component.HTMLSource);
+            targetDir = fileparts(testCase.FixtureHtml);
+            pErudaDest = fullfile(targetDir, "eruda.js");
+
+            % Perform cleanup by deleting the object
+            delete(devTools);
+
+            % Temp file and copied eruda.js are both deleted on destruction
+            testCase.verifyFalse(isfile(tempFile));
+            testCase.verifyFalse(isfile(pErudaDest));
+
+            % Original HTMLSource is restored on destruction
+            testCase.verifyEqual(string(testCase.Component.HTMLSource), testCase.FixtureHtml);
+        end % function testCleanup
+
+        function testNoBodyTag(testCase)
+            tempDir = tempname;
+            mkdir(tempDir);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
+            noBodyHtml = fullfile(tempDir, "test_no_body.html");
+            writelines("<html><p>No body</p></html>", noBodyHtml);
+            testCase.Component.HTMLSource = noBodyHtml;
+
+            devTools = UIHTMLDevTools(testCase.Component);
+            testCase.addTeardown(@() delete(devTools));
+
+            tempFile = string(testCase.Component.HTMLSource);
+            content = fileread(tempFile);
+            testCase.verifySubstring(content, "eruda.init()");
+            testCase.verifyTrue(endsWith(strtrim(content), "</script>"));
+        end % function testNoBodyTag
+
+        function testEmptyTargetDir(testCase)
+            origDir = pwd;
+            tempDir = tempname;
+            mkdir(tempDir);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
+            testCase.addTeardown(@() cd(origDir));
+            
+            testFile = which(mfilename);
+            testDir = fileparts(testFile);
+            origHtml = fullfile(testDir, "html", "test_page.html");
+            copyfile(origHtml, fullfile(tempDir, "test.html"));
+            
+            cd(tempDir);
+            mockComp = MockComponent();
+            mockComp.HTMLSource = "test.html";
+            
+            devTools = UIHTMLDevTools(mockComp);
+            testCase.addTeardown(@() delete(devTools));
+            
+            testCase.verifyTrue(isfile("eruda.js"));
+            testCase.verifySubstring(string(mockComp.HTMLSource), "_devtools_");
+        end % function testEmptyTargetDir
+
+        function testDeleteWithMissingFiles(testCase)
+            devTools = UIHTMLDevTools(testCase.Component);
+            
+            % Delete files manually before object delete
+            tempFile = string(testCase.Component.HTMLSource);
+            delete(tempFile);
+            
+            targetDir = fileparts(testCase.FixtureHtml);
+            pErudaDest = fullfile(targetDir, "eruda.js");
+            if isfile(pErudaDest)
+                delete(pErudaDest);
+            end
+            
+            % Should not error/warning if they don't exist
+            delete(devTools);
+        end % function testDeleteWithMissingFiles
+
+        function testUrlSourceMock(testCase)
+            mockComp = MockComponent();
+            mockComp.HTMLSource = "http://example.com";
+            testCase.verifyError(@() UIHTMLDevTools(mockComp), ...
+                "uihtmlDevTools:UrlHTMLSource");
+        end % function testUrlSourceMock
+
+        function testInvalidFileSourceMock(testCase)
+            mockComp = MockComponent();
+            mockComp.HTMLSource = "non_existent_file.html";
+            testCase.verifyError(@() UIHTMLDevTools(mockComp), ...
+                "uihtmlDevTools:InvalidHTMLSource");
+        end % function testInvalidFileSourceMock
+    end % methods (Test)
+end % classdef tUIHTMLDevTools

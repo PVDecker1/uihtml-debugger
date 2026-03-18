@@ -1,74 +1,88 @@
-# UIHTML Console Error Rerouter
+# UIHTML Debugger for MATLAB
 
-A robust solution for seamlessly integrating JavaScript console messages from MATLAB's `uihtml` components directly into the MATLAB Command Window. This tool centralizes your debugging efforts and gains immediate visibility into front-end issues without needing to inspect the browser's developer console separately.
+The UIHTML Debugger is a non-intrusive toolkit designed to bridge the gap between MATLAB and JavaScript development. It provides two essential tools to streamline web-based UI development within MATLAB:
 
----
-
-## How It Works
-
-1.  **MATLAB Class (`ConsoleErrorRerouter`)**: A simple class that wraps a `uihtml` component and listens for custom console events.
-2.  **Inlined Shim Injection**: On construction, the class creates a temporary copy of your HTML file with an inlined JavaScript shim injected at the end of the `<body>`.
-3.  **Setup Hook**: The shim automatically wraps your global `setup(htmlComponent)` function to capture the internal MATLAB component reference, allowing it to send messages back via `sendEventToMATLAB`.
-
----
-
-## Getting Started
-
-### 1. Requirements
-
-For the rerouting to work, your HTML file **must** define a global `setup(htmlComponent)` function. This is the standard pattern for bidirectional communication in MATLAB `uihtml`.
-
-```javascript
-// index.html
-function setup(htmlComponent) {
-    // Your application logic here
-    console.log("Application is ready!");
-}
-```
-
-### 2. Basic Usage
-
-Attach the rerouter to your `uihtml` component in MATLAB.
-
-```matlab
-fig = uifigure;
-h = uihtml(fig);
-h.HTMLSource = 'index.html';
-
-% Create the rerouter
-rerouter = ConsoleErrorRerouter(h);
-
-% Optional: Configure which levels to intercept (default is just ["error"])
-rerouter.ErrorLevels = ["error", "warn", "info", "log", "debug"];
-```
+1.  **Console Error Rerouter**: Forwards console.log, warn, and error messages directly to the MATLAB Command Window.
+2.  **UIHTML DevTools**: Injects Eruda—a full-featured mobile-style console—directly into your UI for deep inspection without leaving the MATLAB environment.
 
 ---
 
 ## Features
 
-*   **Configurable Error Levels**: Intercept `error`, `warn`, `info`, `log`, and `debug` messages.
-*   **Custom Formatters**: Provide your own function handle to format the output.
-*   **Non-Intrusive**: Uses `addlistener` to ensure it doesn't clobber any existing `HTMLEventReceivedFcn` or other event handlers you have registered.
-*   **Clean Output**: Suppresses internal MATLAB backtraces for warnings to provide focused, relevant debugging information.
-*   **Automatic Cleanup**: Destroys temporary files and restores the original `HTMLSource` when the object is deleted.
+*   **Zero-Configuration Rerouting**: View JavaScript errors in the MATLAB Command Window in real-time.
+*   **Integrated Inspector**: Inspect elements, view network requests, and execute JavaScript snippets via the injected Eruda console.
+*   **Non-Intrusive Integration**: Utilizes addlistener to avoid conflicts with existing HTMLEventReceivedFcn handlers.
+*   **Automated Cleanup**: Temporary injected files are automatically removed upon object destruction to prevent file accumulation.
+*   **Configurable Interception**: Define specific console levels to intercept and customize output formatting.
 
 ---
 
-## Running Examples
+## Visual Demonstration
 
-Explore the `examples/` directory for ready-to-run scripts:
+### 1. Console Rerouting
+![Console Rerouting](images/Rerouter_CommandWindow.png)
 
-*   `basic_usage.m`: Simple demonstration of rerouting all console levels.
-*   `custom_formatting.m`: Demonstrates how to use a custom function to format the rerouted messages.
+### 2. In-App DevTools (Eruda)
+![Eruda DevTools](images/DevTools_Figure.png)
+
+---
+
+## Getting Started
+
+### 1. Requirement: The setup Hook
+To enable communication between the debugger and your UI, your HTML file must define a global `setup(htmlComponent)` function. This is the standard pattern for bidirectional communication in MATLAB uihtml components.
+
+```javascript
+// index.html
+function setup(htmlComponent) {
+    console.log("Application initialized");
+}
+```
+
+### 2. Basic Usage in MATLAB
+
+```matlab
+fig = uifigure;
+h = uihtml(fig, 'HTMLSource', 'index.html');
+
+% Tool 1: Console Rerouter
+% Forwards JavaScript messages to the Command Window
+rerouter = ConsoleErrorRerouter(h);
+rerouter.ErrorLevels = ["error", "warn", "log"]; % Optional configuration
+
+% Tool 2: DevTools
+% Injects the Eruda inspector icon into the UI
+devTools = UIHTMLDevTools(h);
+```
+
+---
+
+## Examples
+
+Ready-to-run scripts are available in the `toolbox/examples/` directory:
+*   `devtools_usage.m`: A comprehensive demonstration showing both tools working in tandem.
+*   `basic_usage.m`: A minimal example focusing on console rerouting.
+*   `custom_formatting.m`: Instructions on customizing the appearance of rerouted messages.
 
 ---
 
 ## Testing
 
-The project includes unit tests built with the `matlab.unittest` framework to verify the rerouter's behavior, including shim injection and message filtering.
+The project includes a comprehensive test suite with over 85% code coverage. To verify the installation, run the following command in MATLAB:
 
-To run the tests:
 ```matlab
-results = runtests("tests/tConsoleErrorRerouter.m");
+results = runtests('tests/tUIHTMLDevTools.m');
 disp(results);
 ```
+
+---
+
+## Credits and Acknowledgments
+
+This project utilizes **[Eruda](https://github.com/liriliri/eruda)**. Eruda's mobile-first console interface provides a professional-grade debugging environment within the technical constraints of the MATLAB uihtml component.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

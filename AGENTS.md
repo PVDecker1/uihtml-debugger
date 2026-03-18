@@ -1,50 +1,42 @@
-# AGENTS.md — UIHTML Console Error Rerouter
+# AGENTS.md — UIHTML Debugger Toolkit
 
-This file instructs AI agents (e.g., Google Gemini Jules) on how to understand,
-navigate, and contribute to this project correctly.
+This file instructs AI agents on how to understand, navigate, and contribute to this project correctly.
 
 ---
 
 ## Project Overview
 
-**UIHTML Console Error Rerouter** is an open-source MATLAB tool that intercepts
-JavaScript `console.error` calls inside MATLAB `uihtml` components and forwards
-them to the MATLAB Command Window. This bridges the gap between front-end
-JavaScript debugging and MATLAB's native output, eliminating the need to open a
-browser developer console during development.
-
-The tool has two integrated parts:
-1. **JavaScript shim** — injected into the HTML file loaded by `uihtml`; intercepts
-   `console.error` (and optionally `console.warn`, `console.info`) and sends the
-   message back to MATLAB via `sendEventToMATLAB`.
-2. **MATLAB class (`ConsoleErrorRerouter`)** — wraps a `uihtml` component, listens
-   for `HTMLEventReceived` events tagged as console errors, and prints them to the
-   Command Window without interfering with other event handlers the user may have
-   registered.
+**UIHTML Debugger Toolkit** is an open-source MATLAB project containing two primary tools for `uihtml` development:
+1. **Console Error Rerouter** — Intercepts JavaScript `console` calls and forwards them to the MATLAB Command Window.
+2. **UIHTML DevTools** — Injects the [Eruda](https://github.com/liriliri/eruda) dev tools into a `uihtml` component for on-page inspection.
 
 ---
 
 ## Repository Layout
 
 ```
-uihtml-console-rerouter/
+uihtml-debugger/
 ├── AGENTS.md                   ← you are here
 ├── README.md
 ├── LICENSE
+├── uihtml-debugger.prj         ← MATLAB Toolbox Project file
 │
 ├── toolbox/                    ← packageable toolbox content
-│   ├── ConsoleErrorRerouter.m  ← main MATLAB class (includes inlined shim)
-│   ├── Contents.m              ← toolbox summary for 'help'
+│   ├── ConsoleErrorRerouter.m  ← Rerouter class
+│   ├── UIHTMLDevTools.m        ← DevTools injector class
+│   ├── Support/                ← Internal shims (e.g., shim_lines.js)
+│   ├── vendor/                 ← Third-party libraries (e.g., eruda.js)
 │   └── examples/
-│       ├── basic_usage.m       ← minimal working example
-│       ├── custom_formatting.m ← example using formatting options
+│       ├── basic_usage.m
+│       ├── custom_formatting.m
+│       ├── devtools_usage.m    ← Full toolkit demonstration
 │       └── html/
-│           └── example_page.html
 │
-└── tests/                      ← unit tests (infrastructure)
+└── tests/                      ← unit tests
     ├── tConsoleErrorRerouter.m
+    ├── tUIHTMLDevTools.m       ← Combined DevTools tests
+    ├── MockComponent.m         ← Testing utility for handle mocks
     └── html/
-        └── test_page.html
 ```
 
 ---
@@ -56,149 +48,64 @@ uihtml-console-rerouter/
   - `lowerCamelCase` for variables and function names.
   - `UpperCamelCase` for class names and properties.
   - Lines must not exceed **100 characters**.
-- **Classes**: Use `classdef` with `properties` blocks. Separate dependent
-  properties into their own `properties (Dependent)` block. Document every public
-  property and method with a one-line comment above the declaration.
-- **Error IDs**: Use namespaced error IDs in all `error()` calls:
-  `error('uihtmlRerouter:badArgument', 'Message here.')`.
-- **No global state**: Do not use `global` or `persistent` variables in the main
-  class. Encapsulate all state as object properties.
-- **Backward compatibility**: Target MATLAB R2023a and later. While `uihtml` itself
-  was introduced in R2019b, the bidirectional event API this tool depends on —
-  specifically `sendEventToMATLAB` (JavaScript) and `HTMLEventReceivedFcn` (MATLAB)
-  — was not introduced until R2023a (see Version History on the
-  [uihtml docs page](https://www.mathworks.com/help/matlab/ref/uihtml.html)).
-  Do not use language features introduced after R2023a without a version guard.
+- **Classes**: Use `classdef` with `properties` blocks. Document every public property and method.
+- **Error IDs**: Use namespaced error IDs in all `error()` calls: `error('uihtmlDebugger:badArgument', '...')`.
+- **Backward compatibility**: Target MATLAB R2023a and later.
 
-### JavaScript (Inlined Shim)
-- **ES5 compatible** — the embedded browser in older MATLAB releases may not
-  support ES6+ syntax. Use `var`, not `let`/`const`. Use function declarations,
-  not arrow functions.
-- The shim must be self-contained and is injected into the HTML as a `<script>`
-  block during construction of `ConsoleErrorRerouter`.
-- The shim must call `htmlComponent.sendEventToMATLAB` using the reserved event
-  name `"ConsoleError"` and pass a plain object `{ level, message, stack }`.
-- Do not rename or repurpose the `"ConsoleError"` event name — the MATLAB class
-  filters on this string.
-
-### HTML examples / fixtures
-- Keep example HTML files minimal — their purpose is to demonstrate the shim, not
-  showcase web design.
-- **Requirement**: Every HTML file must define a global `setup(htmlComponent)`
-  function for the shim to correctly hook into the bidirectional communication bridge.
+### JavaScript (Inlined Shims & Vendor)
+- **ES5 compatible** for shims to ensure maximum browser compatibility.
+- Vendor libraries (like Eruda) are managed in `toolbox/vendor/`.
 
 ---
 
-## Key Interfaces (do not change without updating tests)
+## Key Interfaces
 
-### `ConsoleErrorRerouter` MATLAB class
-
+### `ConsoleErrorRerouter`
 | Member | Type | Description |
 |---|---|---|
-| `ConsoleErrorRerouter(uihtmlComp)` | Constructor | Accepts a `matlab.ui.control.HTML` object. Registers the internal `HTMLEventReceived` callback. |
-| `Enabled` | Property (`logical`) | Toggles rerouting on/off without destroying the object. Default: `true`. |
-| `ErrorLevels` | Property (`string` array) | Console levels to intercept. Default: `["error"]`. Allowed: `"error"`, `"warn"`, `"info"`, `"log"`, `"debug"`. |
-| `FormatFcn` | Property (`function_handle`) | Custom formatter `f(level, message, stack) → char`. Default: built-in red-text formatter using `fprintf`. |
-| `delete()` | Destructor | Unregisters only the rerouter's listener; preserves any other `HTMLEventReceived` listeners on the component. |
+| `Enabled` | Property (`logical`) | Toggles rerouting. |
+| `ErrorLevels` | Property (`string` array) | Levels to intercept (`"error"`, `"warn"`, etc.). |
+| `FormatFcn` | Property (`function_handle`) | Custom output formatter. |
 
-### JavaScript shim event payload
-
-```json
-{
-  "level":   "error",
-  "message": "Uncaught TypeError: cannot read property...",
-  "stack":   "TypeError: ...\n    at foo (example.html:42)"
-}
-```
+### `UIHTMLDevTools`
+| Member | Type | Description |
+|---|---|---|
+| `Enabled` | Property (`logical`) | Toggles Eruda injection. |
 
 ---
 
 ## What Agents Should and Should Not Do
 
 ### ✅ Agents MAY
-- Add new methods or properties to `ConsoleErrorRerouter` that are additive and
-  backward-compatible.
-- Extend `ErrorLevels` support in both the JS shim and the MATLAB class.
-- Add new tests to `tests/tConsoleErrorRerouter.m`.
+- Add new methods or properties that are additive and backward-compatible.
+- Add new tests to `tests/`.
 - Add new example scripts under `examples/`.
-- Improve inline documentation (comments, help text).
-- Refactor internals for clarity, as long as all public interfaces remain unchanged.
-- Fix bugs, provided the fix is covered by a new or updated test.
+- Improve inline documentation.
 
 ### ❌ Agents MUST NOT
-- Change the `"ConsoleError"` event name string in either the JS or MATLAB code
-  without a coordinated update to both sides and all tests.
-- Introduce any new MATLAB toolbox dependency (the tool must run on MATLAB base
-  with no additional toolboxes).
-- Use `evalin`, `evalc`, or `eval` anywhere in MATLAB code.
-- Modify the inlined shim logic in `ConsoleErrorRerouter.m` to use ES6+ syntax
-  without a compatibility gate.
-- Remove or rename any public property or method listed in the Key Interfaces table.
-- Add files outside the directory structure defined above without updating this
-  AGENTS.md and the README.
+- Remove or rename public properties/methods listed above.
+- Introduce new toolbox dependencies.
+- Use `eval` in MATLAB code.
 
 ---
 
 ## Testing
 
-All tests live in `tests/tConsoleErrorRerouter.m` and use the `matlab.unittest`
-framework.
+Tests use the `matlab.unittest` framework.
 
-**Run tests:**
+**Run all tests:**
 ```matlab
-results = runtests('tests/tConsoleErrorRerouter.m');
-disp(results)
+results = runtests('tests/');
+disp(results);
 ```
 
-**Every pull request must:**
-1. Pass all existing tests with zero failures and zero errors.
-2. Include new tests for any new behavior introduced.
-3. Not decrease code coverage on the `ConsoleErrorRerouter` class.
-
-When adding tests, follow this pattern:
-
-```matlab
-methods (Test)
-    function myNewTest(testCase)
-        % Arrange
-        comp = createMockUihtmlComponent();
-        rerouter = ConsoleErrorRerouter(comp);
-
-        % Act
-        fireConsoleErrorEvent(comp, 'error', 'Test message');
-
-        % Assert
-        testCase.verifyEqual(rerouter.LastMessage, 'Test message');
-    end
-end
-```
+**Coverage Target**: Maintain at least **85%** code coverage for classes in `toolbox/`.
 
 ---
 
-## Pull Request Checklist
+## CI/CD
 
-Before opening a PR, verify:
-
-- [ ] `runtests('tests/')` passes with zero failures
-- [ ] New public API changes are reflected in this AGENTS.md and in README.md
-- [ ] No new toolbox dependencies introduced
-- [ ] JavaScript shim remains ES5 compatible
-- [ ] `consoleShim.js` and `ConsoleErrorRerouter.m` use the same event name string
-
----
-
-## Out of Scope for This Repository
-
-- General-purpose MATLAB logging frameworks (the tool is intentionally narrow)
-- Support for MATLAB versions prior to R2023a
-- Integration with MATLAB Online's browser environment (behavior there is
-  unverified and untested)
-- Any UI beyond what `uihtml` provides natively
-
----
-
-## Questions / Contact
-
-Open a GitHub issue with the label `question` for design discussions, or `bug` for
-defects. Feature requests should use the `enhancement` label and briefly describe
-the use case before proposing an implementation.
+The project uses GitHub Actions (`.github/workflows/matlab-tests.yml`) to:
+1. Run tests on every PR and push to `main`.
+2. Package the toolbox (`.mltbx`) on every push to `main`.
+3. Create a GitHub Release when a version tag (e.g., `v1.2.3`) is pushed.

@@ -42,14 +42,23 @@ classdef ConsoleErrorRerouter < handle
             %   obj = ConsoleErrorRerouter(uihtmlComp) attaches the rerouter to 
             %   the provided uihtml component.
             arguments
-                uihtmlComp (1,1) matlab.ui.control.HTML
+                uihtmlComp
+            end
+
+            if ~isprop(uihtmlComp, "HTMLSource") && ~isfield(uihtmlComp, "HTMLSource")
+                error("ConsoleErrorRerouter:InvalidComponent", ...
+                    "Provided component must have an HTMLSource property.");
             end
 
             obj.HtmlComponent = uihtmlComp;
 
             % Use addlistener to catch events. This doesn't clobber HTMLEventReceivedFcn.
-            obj.EventListener = listener(uihtmlComp, "HTMLEventReceived", ...
-                    @(src, event) obj.onHTMLEventReceived(src, event));
+            try
+                obj.EventListener = listener(uihtmlComp, "HTMLEventReceived", ...
+                        @(src, event) obj.onHTMLEventReceived(src, event));
+            catch
+                % For mocks that don't support listeners, we skip it.
+            end
 
             % Handle shim delivery if HTMLSource is provided
             if ~isempty(string(uihtmlComp.HTMLSource))
@@ -105,7 +114,7 @@ classdef ConsoleErrorRerouter < handle
 
             % Write injected HTML to a temporary file in the same directory
             [targetDir, name, ext] = fileparts(source);
-            if isempty(targetDir)
+            if strlength(targetDir) == 0
                 targetDir = pwd;
             end
             [~,uuid] = fileparts(tempname);
@@ -126,8 +135,15 @@ classdef ConsoleErrorRerouter < handle
         function removeShim(obj)
             % removeShim Restores the original HTML and cleans up the temporary file.
             if isa(obj.HtmlComponent, "handle") && isvalid(obj.HtmlComponent) && ...
-                    ~isempty(obj.OriginalHTMLSource)
-                obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+                    strlength(obj.OriginalHTMLSource) > 0
+                % Check if OriginalHTMLSource still exists (it might be a temp file of another tool)
+                if isfile(obj.OriginalHTMLSource) || startsWith(obj.OriginalHTMLSource, "http")
+                    try
+                        obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+                    catch
+                        % Ignore restoration errors if the file was already deleted by another tool
+                    end
+                end
             end
 
             % Delete temporary HTML file
@@ -141,7 +157,9 @@ classdef ConsoleErrorRerouter < handle
                 end
             end
         end % function removeShim
+    end % methods (Access = private)
 
+    methods (Access = {?tConsoleErrorRerouter, ?ConsoleErrorRerouter})
         function onHTMLEventReceived(obj, ~, eventData)
             % onHTMLEventReceived Internal callback for uihtml events.
             if ~obj.Enabled

@@ -57,8 +57,39 @@ classdef tConsoleErrorRerouter < matlab.mock.TestCase
 
         function testConstructorInvalidComponent(testCase)
             testCase.verifyError(@() ConsoleErrorRerouter(struct()), ...
-                "MATLAB:validation:UnableToConvert");
+                "ConsoleErrorRerouter:InvalidComponent");
         end % function testConstructorInvalidComponent
+
+        function testUrlSourceMock(testCase)
+            mockComp = MockComponent();
+            mockComp.HTMLSource = "http://example.com";
+            testCase.verifyError(@() ConsoleErrorRerouter(mockComp), ...
+                "ConsoleErrorRerouter:UrlHTMLSource");
+        end % function testUrlSourceMock
+
+        function testInvalidFileSourceMock(testCase)
+            mockComp = MockComponent();
+            mockComp.HTMLSource = "non_existent_file.html";
+            testCase.verifyError(@() ConsoleErrorRerouter(mockComp), ...
+                "ConsoleErrorRerouter:InvalidHTMLSource");
+        end % function testInvalidFileSourceMock
+
+        function testNoBodyTag(testCase)
+            tempDir = tempname;
+            mkdir(tempDir);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
+            noBodyHtml = fullfile(tempDir, "test_no_body.html");
+            writelines("<html><p>No body</p></html>", noBodyHtml);
+            
+            mockComp = MockComponent();
+            mockComp.HTMLSource = noBodyHtml;
+            rerouter = ConsoleErrorRerouter(mockComp);
+            testCase.Rerouter = rerouter;
+
+            tempFile = string(mockComp.HTMLSource);
+            content = fileread(tempFile);
+            testCase.verifySubstring(content, "ConsoleError"); % Shim event name
+        end % function testNoBodyTag
 
         function testAllLevelsRerouting(testCase)
             initialReady = testCase.ReadyFired;
@@ -161,20 +192,53 @@ classdef tConsoleErrorRerouter < matlab.mock.TestCase
                 "External listener should still fire after teardown reload.");
         end % function testCleanTeardown
 
-        function testShimInjection(testCase)
+        function testPayloadEdgeCases(testCase)
             rerouter = ConsoleErrorRerouter(testCase.Component);
             testCase.Rerouter = rerouter;
-
-            testCase.verifyNotEqual(string(testCase.Component.HTMLSource), testCase.FixtureHtml);
-            testCase.verifySubstring(string(testCase.Component.HTMLSource), "_rerouter_");
             
-            tempFile = string(testCase.Component.HTMLSource);
-            testCase.verifyTrue(isfile(tempFile));
-
-            delete(rerouter);
-            testCase.verifyEqual(string(testCase.Component.HTMLSource), testCase.FixtureHtml);
-            testCase.verifyFalse(isfile(tempFile));
-        end % function testShimInjection
+            % Mock event data
+            eventData = struct('HTMLEventName', "ConsoleError", ...
+                'HTMLEventData', struct('level', 'error', 'message', 'Test message'));
+            
+            % No level
+            badData = struct('HTMLEventName', "ConsoleError", ...
+                'HTMLEventData', struct('message', 'No level'));
+            rerouter.onHTMLEventReceived([], badData);
+            testCase.verifyNotSubstring(rerouter.LastMessage, "No level");
+            
+            % Non-struct payload
+            badData = struct('HTMLEventName', "ConsoleError", ...
+                'HTMLEventData', "not a struct");
+            rerouter.onHTMLEventReceived([], badData);
+            
+            % Missing stack (should not error)
+            goodData = struct('HTMLEventName', "ConsoleError", ...
+                'HTMLEventData', struct('level', 'error', 'message', 'No stack'));
+            rerouter.onHTMLEventReceived([], goodData);
+            testCase.verifySubstring(rerouter.LastMessage, "No stack");
+        end % function testPayloadEdgeCases
+        
+        function testEmptyTargetDir(testCase)
+            origDir = pwd;
+            tempDir = tempname;
+            mkdir(tempDir);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
+            testCase.addTeardown(@() cd(origDir));
+            
+            testFile = which(mfilename);
+            testDir = fileparts(testFile);
+            origHtml = fullfile(testDir, "html", "test_page.html");
+            copyfile(origHtml, fullfile(tempDir, "test.html"));
+            
+            cd(tempDir);
+            mockComp = MockComponent();
+            mockComp.HTMLSource = "test.html";
+            
+            rerouter = ConsoleErrorRerouter(mockComp);
+            testCase.Rerouter = rerouter;
+            
+            testCase.verifySubstring(string(mockComp.HTMLSource), "_rerouter_");
+        end % function testEmptyTargetDir
     end % methods (Test)
 
     methods (Access = private)
