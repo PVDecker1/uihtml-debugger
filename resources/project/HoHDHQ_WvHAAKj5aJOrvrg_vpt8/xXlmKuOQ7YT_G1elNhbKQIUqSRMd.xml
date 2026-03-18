@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Info description="Integrated debugging toolkit for MATLAB uihtml components. Seamlessly reroutes JavaScript console messages to the MATLAB Command Window and injects Eruda dev tools for on-page inspection, streamlining web-based UI development within MATLAB."/>

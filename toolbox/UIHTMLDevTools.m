@@ -19,13 +19,32 @@ classdef UIHTMLDevTools < handle
     end
 
     methods
+        function set.Enabled(obj, val)
+            if obj.Enabled == val
+                return;
+            end
+            obj.Enabled = val;
+            if obj.Enabled
+                if strlength(string(obj.HtmlComponent.HTMLSource)) > 0
+                    obj.injectEruda();
+                end
+            else
+                obj.removeEruda();
+            end
+        end
+
         function obj = UIHTMLDevTools(uihtmlComp)
             % UIHTMLDevTools Constructor
             %
             %   obj = UIHTMLDevTools(uihtmlComp) attaches the dev tools to
             %   the provided uihtml component.
             arguments
-                uihtmlComp (1,1) matlab.ui.control.HTML
+                uihtmlComp
+            end
+
+            if ~isprop(uihtmlComp, "HTMLSource") && ~isfield(uihtmlComp, "HTMLSource")
+                error("uihtmlDevTools:InvalidComponent", ...
+                    "Provided component must have an HTMLSource property.");
             end
 
             obj.HtmlComponent = uihtmlComp;
@@ -66,7 +85,7 @@ classdef UIHTMLDevTools < handle
 
             % Copy eruda.js to the target directory
             [targetDir, name, ext] = fileparts(source);
-            if isempty(targetDir)
+            if strlength(targetDir) == 0
                 targetDir = pwd;
             end
 
@@ -81,9 +100,9 @@ classdef UIHTMLDevTools < handle
                     "Failed to copy eruda.js to:\n%s", pErudaDest);
             end
 
-            % Prepare the script block
+            % Prepare the script block (Default bottom docking)
             scriptBlock = "<script src=""eruda.js""></script>" + newline + ...
-                          "<script>eruda.init();</script>";
+                "<script>eruda.init();</script>";
 
             % Insert just before </body> or at the end
             [startIdx, ~] = regexpi(htmlContent, "</body>");
@@ -115,7 +134,14 @@ classdef UIHTMLDevTools < handle
             % removeEruda Restores the original HTML and cleans up the temporary files.
             if isa(obj.HtmlComponent, "handle") && isvalid(obj.HtmlComponent) && ...
                     strlength(obj.OriginalHTMLSource) > 0
-                obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+                % Check if OriginalHTMLSource still exists (it might be a temp file of another tool)
+                if isfile(obj.OriginalHTMLSource) || startsWith(obj.OriginalHTMLSource, "http")
+                    try
+                        obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+                    catch
+                        % Ignore restoration errors
+                    end
+                end
             end
 
             % Delete temporary HTML file
@@ -132,7 +158,7 @@ classdef UIHTMLDevTools < handle
             % Delete copied eruda.js
             if strlength(obj.OriginalHTMLSource) > 0
                 [targetDir, ~, ~] = fileparts(obj.OriginalHTMLSource);
-                if isempty(targetDir)
+                if strlength(targetDir) == 0
                     targetDir = pwd;
                 end
                 pErudaDest = fullfile(targetDir, "eruda.js");

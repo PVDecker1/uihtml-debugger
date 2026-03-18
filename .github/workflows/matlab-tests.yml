@@ -1,9 +1,11 @@
-name: MATLAB Tests
+name: MATLAB CI
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*'
   pull_request:
 
 jobs:
@@ -27,16 +29,40 @@ jobs:
         uses: matlab-actions/run-tests@v2
         with:
             source-folder: toolbox
-            test-results-junit: test-results.xml
             code-coverage-cobertura: code-coverage/coverage.xml
-            test-results-html: test-results
 
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: always()
+  package:
+    name: Package and Release
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v2
+
+      - name: Package Toolbox
+        uses: matlab-actions/run-command@v2
         with:
-            name: test-artifacts
-            path: |
-                test-results.xml
-                test-results/
-                code-coverage/
+          command: |
+            matlab.addons.toolbox.packageToolbox('uihtml-debugger.prj', 'uihtml-debugger.mltbx');
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: uihtml-debugger.mltbx
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifact (on main)
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: uihtml-debugger-mltbx
+          path: uihtml-debugger.mltbx
