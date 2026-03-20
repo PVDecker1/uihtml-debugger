@@ -231,7 +231,8 @@ classdef tUIHTMLDevTools < matlab.unittest.TestCase
                 mockComp.HTMLSource = htmlFile;
                 % On Linux, copyfile hits the read-only dir first.
                 testCase.verifyError(@() UIHTMLDevTools(mockComp), ...
-                    "(uihtmlDevTools:TempWriteFailure|uihtmlDevTools:ErudaCopyFailure)");
+                    matlab.unittest.constraints.HasIdentifier("uihtmlDevTools:TempWriteFailure") | ...
+                    matlab.unittest.constraints.HasIdentifier("uihtmlDevTools:ErudaCopyFailure"));
             end
         end % function testTempWriteFailure
 

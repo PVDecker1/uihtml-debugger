@@ -124,7 +124,7 @@ classdef ConsoleErrorRerouter < handle
                 writelines(newHtml,obj.TempHTMLPath);
             catch
                 error("ConsoleErrorRerouter:TempWriteFailure", ...
-                    "Filed to write temporary html file to:\n%s",obj.TempHTMLPath);
+                    "Failed to write temporary html file to:\n%s",obj.TempHTMLPath);
             end
 
             % Update the component's HTMLSource with the temporary file path.
