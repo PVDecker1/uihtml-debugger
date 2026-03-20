@@ -134,21 +134,17 @@ classdef UIHTMLDevTools < handle
             % removeEruda Restores the original HTML and cleans up the temporary files.
             if isa(obj.HtmlComponent, "handle") && isvalid(obj.HtmlComponent) && ...
                     strlength(obj.OriginalHTMLSource) > 0
-                % Check if OriginalHTMLSource still exists (it might be a temp file of another tool)
-                if isfile(obj.OriginalHTMLSource) || startsWith(obj.OriginalHTMLSource, "http")
-                    try
-                        obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
-                    catch
-                        % Ignore restoration errors
-                    end
+                try
+                    obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+                catch
+                    % Ignore restoration errors
                 end
             end
 
             % Delete temporary HTML file
             if strlength(obj.TempHTMLPath) > 0 && isfile(obj.TempHTMLPath)
-                try
-                    delete(obj.TempHTMLPath);
-                catch
+                delete(obj.TempHTMLPath);
+                if isfile(obj.TempHTMLPath)
                     warning("uihtmlDevTools:FailedCleanup", ...
                         "Failed to delete %s. Please check your file system", ...
                         obj.TempHTMLPath)
@@ -163,9 +159,8 @@ classdef UIHTMLDevTools < handle
                 end
                 pErudaDest = fullfile(targetDir, "eruda.js");
                 if isfile(pErudaDest)
-                    try
-                        delete(pErudaDest);
-                    catch
+                    delete(pErudaDest);
+                    if isfile(pErudaDest)
                         warning("uihtmlDevTools:FailedCleanup", ...
                             "Failed to delete %s. Please check your file system", ...
                             pErudaDest)

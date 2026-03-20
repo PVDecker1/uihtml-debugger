@@ -74,7 +74,7 @@ classdef tUIHTMLDevTools < matlab.unittest.TestCase
             testCase.verifyNotEqual(tempFile, string(origHtml));
             testCase.verifyTrue(isfile(tempFile));
 
-            % Set Enabled to same value
+            % Set Enabled to same value - should be a no-op
             devTools.Enabled = true;
 
             % Disable
@@ -131,39 +131,108 @@ classdef tUIHTMLDevTools < matlab.unittest.TestCase
             mkdir(tempDir);
             testCase.addTeardown(@() rmdir(tempDir, 's'));
             testCase.addTeardown(@() cd(origDir));
-            
+
             testFile = which(mfilename);
             testDir = fileparts(testFile);
             origHtml = fullfile(testDir, "html", "test_page.html");
             copyfile(origHtml, fullfile(tempDir, "test.html"));
-            
+
             cd(tempDir);
             mockComp = MockComponent();
             mockComp.HTMLSource = "test.html";
-            
+
             devTools = UIHTMLDevTools(mockComp);
             testCase.addTeardown(@() delete(devTools));
-            
+
             testCase.verifyTrue(isfile("eruda.js"));
             testCase.verifySubstring(string(mockComp.HTMLSource), "_devtools_");
         end % function testEmptyTargetDir
 
+        function testCleanupWarnings(testCase)
+            if isunix
+                tempDir = tempname;
+                mkdir(tempDir);
+                testCase.addTeardown(@() rmdir(tempDir, 's'));
+                htmlFile = fullfile(tempDir, "test.html");
+                writelines("<html><body></body></html>", htmlFile);
+
+                mockComp = MockComponent();
+                mockComp.HTMLSource = htmlFile;
+                devTools = UIHTMLDevTools(mockComp);
+
+                % On Linux, make the directory read-only to force delete failure
+                fileattrib(tempDir, '-w');
+                testCase.addTeardown(@() fileattrib(tempDir, '+w'));
+
+                testCase.verifyWarning(@() delete(devTools), "uihtmlDevTools:FailedCleanup");
+            end
+        end % function testCleanupWarnings
+
         function testDeleteWithMissingFiles(testCase)
             devTools = UIHTMLDevTools(testCase.Component);
-            
+
             % Delete files manually before object delete
             tempFile = string(testCase.Component.HTMLSource);
-            delete(tempFile);
-            
+            if isfile(tempFile)
+                delete(tempFile);
+            end
+
             targetDir = fileparts(testCase.FixtureHtml);
             pErudaDest = fullfile(targetDir, "eruda.js");
             if isfile(pErudaDest)
                 delete(pErudaDest);
             end
-            
-            % Should not error/warning if they don't exist
+
+            % Should not error or warn if files don't exist
             delete(devTools);
         end % function testDeleteWithMissingFiles
+
+        function testDeleteInvalidComponent(testCase)
+            devTools = UIHTMLDevTools(testCase.Component);
+            testCase.DevTools = devTools;
+            delete(testCase.Figure); % Deletes component too
+            delete(devTools); % Should not error in removeEruda
+            testCase.DevTools = [];
+        end % function testDeleteInvalidComponent
+
+        function testOriginalSourceDeleted(testCase)
+            tempDir = tempname;
+            mkdir(tempDir);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
+            htmlFile = fullfile(tempDir, "temp.html");
+            writelines("<html><body></body></html>", htmlFile);
+
+            mockComp = MockComponent();
+            mockComp.HTMLSource = htmlFile;
+            devTools = UIHTMLDevTools(mockComp);
+
+            % Delete original source before devTools is deleted
+            delete(htmlFile);
+
+            % removeEruda should handle this gracefully
+            delete(devTools);
+            testCase.verifyEqual(string(mockComp.HTMLSource), string(htmlFile));
+        end % function testOriginalSourceDeleted
+
+        function testErudaCopyFailure(testCase)
+            if isunix
+                tempDir = tempname;
+                mkdir(tempDir);
+                testCase.addTeardown(@() rmdir(tempDir, 's'));
+                htmlFile = fullfile(tempDir, "test.html");
+                writelines("<html><body></body></html>", htmlFile);
+
+                % Make directory read-only -- copyfile runs before writelines
+                % so ErudaCopyFailure is always the first error thrown
+                fileattrib(tempDir, '-w');
+                testCase.addTeardown(@() fileattrib(tempDir, '+w'));
+
+                mockComp = MockComponent();
+                mockComp.HTMLSource = htmlFile;
+                testCase.verifyError(@() UIHTMLDevTools(mockComp), ...
+                    "uihtmlDevTools:ErudaCopyFailure");
+            end
+        end % function testErudaCopyFailure
 
         function testUrlSourceMock(testCase)
             mockComp = MockComponent();

@@ -7,7 +7,14 @@
 The UIHTML Debugger is a non-intrusive toolkit designed to bridge the gap between MATLAB and JavaScript development. It provides two essential tools to streamline web-based UI development within MATLAB:
 
 1.  **Console Error Rerouter**: Forwards console.log, warn, and error messages directly to the MATLAB Command Window.
-2.  **UIHTML DevTools**: Injects Eruda—a full-featured mobile-style console—directly into your UI for deep inspection without leaving the MATLAB environment.
+1.  **UIHTML DevTools**: Injects Eruda—a full-featured mobile-style console—directly into your UI for deep inspection without leaving the MATLAB environment.
+
+---
+
+## Requirements
+
+*   **MATLAB R2023a** or later.
+*   **Base MATLAB** (no additional toolboxes required).
 
 ---
 

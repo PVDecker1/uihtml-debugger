@@ -61,7 +61,7 @@ classdef ConsoleErrorRerouter < handle
             end
 
             % Handle shim delivery if HTMLSource is provided
-            if ~isempty(string(uihtmlComp.HTMLSource))
+            if strlength(string(uihtmlComp.HTMLSource)) > 0
                 obj.injectShim();
             end
         end % Constructor
@@ -124,7 +124,7 @@ classdef ConsoleErrorRerouter < handle
                 writelines(newHtml,obj.TempHTMLPath);
             catch
                 error("ConsoleErrorRerouter:TempWriteFailure", ...
-                    "Filed to write temporary html file to:\n%s",obj.TempHTMLPath);
+                    "Failed to write temporary html file to:\n%s",obj.TempHTMLPath);
             end
 
             % Update the component's HTMLSource with the temporary file path.
@@ -136,21 +136,17 @@ classdef ConsoleErrorRerouter < handle
             % removeShim Restores the original HTML and cleans up the temporary file.
             if isa(obj.HtmlComponent, "handle") && isvalid(obj.HtmlComponent) && ...
                     strlength(obj.OriginalHTMLSource) > 0
-                % Check if OriginalHTMLSource still exists (it might be a temp file of another tool)
-                if isfile(obj.OriginalHTMLSource) || startsWith(obj.OriginalHTMLSource, "http")
-                    try
-                        obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
-                    catch
-                        % Ignore restoration errors if the file was already deleted by another tool
-                    end
+                try
+                    obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+                catch
+                    % Ignore restoration errors
                 end
             end
 
             % Delete temporary HTML file
             if ~isempty(obj.TempHTMLPath) && isfile(obj.TempHTMLPath)
-                try
-                    delete(obj.TempHTMLPath);
-                catch
+                delete(obj.TempHTMLPath);
+                if isfile(obj.TempHTMLPath)
                     warning("ConsoleErrorRerouter:FailedCleanup", ...
                         "Failed to delete %s. Please check your file system", ...
                         obj.TempHTMLPath)

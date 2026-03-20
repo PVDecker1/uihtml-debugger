@@ -60,6 +60,13 @@ classdef tConsoleErrorRerouter < matlab.mock.TestCase
                 "ConsoleErrorRerouter:InvalidComponent");
         end % function testConstructorInvalidComponent
 
+        function testConstructorNoSource(testCase)
+            testCase.Component.HTMLSource = "";
+            rerouter = ConsoleErrorRerouter(testCase.Component);
+            testCase.addTeardown(@() delete(rerouter));
+            testCase.verifyEqual(string(testCase.Component.HTMLSource), "");
+        end % function testConstructorNoSource
+
         function testUrlSourceMock(testCase)
             mockComp = MockComponent();
             mockComp.HTMLSource = "http://example.com";
@@ -216,8 +223,115 @@ classdef tConsoleErrorRerouter < matlab.mock.TestCase
                 'HTMLEventData', struct('level', 'error', 'message', 'No stack'));
             rerouter.onHTMLEventReceived([], goodData);
             testCase.verifySubstring(rerouter.LastMessage, "No stack");
+
+            % Object payload (instead of struct)
+            mockPayload = struct('level', 'error', 'message', 'Object message');
+            objData = struct('HTMLEventName', "ConsoleError", ...
+                'HTMLEventData', mockPayload);
+            rerouter.onHTMLEventReceived([], objData);
+            testCase.verifySubstring(rerouter.LastMessage, "Object message");
+
+            % Missing level
+            badData = struct('HTMLEventName', "ConsoleError", ...
+                'HTMLEventData', struct('message', 'No level'));
+            % We can't set LastMessage, but we know it should NOT be "No level"
+            % It currently is "Object message" from previous step
+            rerouter.onHTMLEventReceived([], badData);
+            testCase.verifyEqual(rerouter.LastMessage, "Object message");
+
+            % Other event name
+            otherData = struct('HTMLEventName', "OtherEvent", ...
+                'HTMLEventData', struct('level', 'error', 'message', 'Ignored'));
+            rerouter.onHTMLEventReceived([], otherData);
+            testCase.verifyEqual(rerouter.LastMessage, "Object message");
         end % function testPayloadEdgeCases
+
+        function testListenerSetupFailure(testCase)
+            tempDir = tempname;
+            mkdir(tempDir);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
+            htmlFile = fullfile(tempDir, "test.html");
+            writelines("<html></html>", htmlFile);
+            
+            % Create a struct that doesn't support listeners but has valid HTMLSource
+            mock = struct('HTMLSource', htmlFile);
+            rerouter = ConsoleErrorRerouter(mock);
+            testCase.addTeardown(@() delete(rerouter));
+            testCase.verifyClass(rerouter, "ConsoleErrorRerouter");
+        end % function testListenerSetupFailure
+
+        function testDeleteInvalidComponent(testCase)
+            rerouter = ConsoleErrorRerouter(testCase.Component);
+            testCase.Rerouter = rerouter;
+            delete(testCase.Figure); % Deletes component too
+            delete(rerouter); % Should not error in removeShim
+            testCase.Rerouter = [];
+        end % function testDeleteInvalidComponent
+
+        function testOriginalSourceDeleted(testCase)
+            tempDir = tempname;
+            mkdir(tempDir);
+            testCase.addTeardown(@() rmdir(tempDir, 's'));
+            htmlFile = fullfile(tempDir, "temp.html");
+            writelines("<html><body></body></html>", htmlFile);
+            
+            mockComp = MockComponent();
+            mockComp.HTMLSource = htmlFile;
+            rerouter = ConsoleErrorRerouter(mockComp);
+            
+            % Delete original source before rerouter is deleted
+            delete(htmlFile);
+            
+            % removeShim should handle this gracefully
+            delete(rerouter);
+            testCase.verifyEqual(string(mockComp.HTMLSource), string(htmlFile));
+        end % function testOriginalSourceDeleted
         
+        function testCleanupWarnings(testCase)
+            if isunix
+                tempDir = tempname;
+                mkdir(tempDir);
+                testCase.addTeardown(@() rmdir(tempDir, 's'));
+                htmlFile = fullfile(tempDir, "test.html");
+                writelines("<html><body></body></html>", htmlFile);
+                
+                mockComp = MockComponent();
+                mockComp.HTMLSource = htmlFile;
+                rerouter = ConsoleErrorRerouter(mockComp);
+                
+                % On Linux, to make delete fail, we make the directory read-only
+                tempFile = string(mockComp.HTMLSource);
+                fileattrib(tempDir, '-w');
+                testCase.addTeardown(@() fileattrib(tempDir, '+w'));
+                
+                testCase.verifyWarning(@() delete(rerouter), "ConsoleErrorRerouter:FailedCleanup");
+            end
+        end % function testCleanupWarnings
+
+        function testTempWriteFailure(testCase)
+            if isunix
+                % On Unix, we can easily make a directory read-only
+                tempDir = tempname;
+                mkdir(tempDir);
+                testCase.addTeardown(@() rmdir(tempDir, 's'));
+                htmlFile = fullfile(tempDir, "test.html");
+                writelines("<html></html>", htmlFile);
+                
+                % Make dir read-only
+                fileattrib(tempDir, '-w');
+                testCase.addTeardown(@() fileattrib(tempDir, '+w'));
+                
+                mockComp = MockComponent();
+                mockComp.HTMLSource = htmlFile;
+                testCase.verifyError(@() ConsoleErrorRerouter(mockComp), ...
+                    "ConsoleErrorRerouter:TempWriteFailure");
+            else
+                % On Windows, it's harder to reliably trigger this via attributes,
+                % so we might skip or use a different trick if needed.
+                % For now, we'll assume unix coverage in CI is enough or skip.
+            end
+        end % function testTempWriteFailure
+
         function testEmptyTargetDir(testCase)
             origDir = pwd;
             tempDir = tempname;
