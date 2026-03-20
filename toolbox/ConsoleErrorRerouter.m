@@ -61,7 +61,7 @@ classdef ConsoleErrorRerouter < handle
             end
 
             % Handle shim delivery if HTMLSource is provided
-            if ~isempty(string(uihtmlComp.HTMLSource))
+            if strlength(string(uihtmlComp.HTMLSource)) > 0
                 obj.injectShim();
             end
         end % Constructor
@@ -136,13 +136,10 @@ classdef ConsoleErrorRerouter < handle
             % removeShim Restores the original HTML and cleans up the temporary file.
             if isa(obj.HtmlComponent, "handle") && isvalid(obj.HtmlComponent) && ...
                     strlength(obj.OriginalHTMLSource) > 0
-                % Check if OriginalHTMLSource still exists (it might be a temp file of another tool)
-                if isfile(obj.OriginalHTMLSource) || startsWith(obj.OriginalHTMLSource, "http")
-                    try
-                        obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
-                    catch
-                        % Ignore restoration errors if the file was already deleted by another tool
-                    end
+                try
+                    obj.HtmlComponent.HTMLSource = obj.OriginalHTMLSource;
+                catch
+                    % Ignore restoration errors
                 end
             end
 

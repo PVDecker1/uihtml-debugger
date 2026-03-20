@@ -1,4 +1,4 @@
-classdef MockComponent < handle
+classdef MockComponent < handle & dynamicprops
     properties
         HTMLSource
     end
