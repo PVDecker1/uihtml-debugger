@@ -31,6 +31,13 @@ jobs:
             source-folder: toolbox
             code-coverage-cobertura: code-coverage/coverage.xml
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: code-coverage/coverage.xml
+          fail_ci_if_error: false
+
   package:
     name: Package and Release
     needs: test
@@ -49,7 +56,14 @@ jobs:
         uses: matlab-actions/run-command@v2
         with:
           command: |
-            matlab.addons.toolbox.packageToolbox('uihtml-debugger.prj', 'uihtml-debugger.mltbx');
+            prjFile = 'uihtml-debugger.prj';
+            tag = getenv('GITHUB_REF_NAME');
+            if startsWith(tag, 'v')
+                version = tag(2:end);
+                fprintf('Updating toolbox version to %s\n', version);
+                matlab.addons.toolbox.toolboxVersion(prjFile, version);
+            end
+            matlab.addons.toolbox.packageToolbox(prjFile, 'uihtml-debugger.mltbx');
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

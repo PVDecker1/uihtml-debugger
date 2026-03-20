@@ -1,5 +1,9 @@
 # UIHTML Debugger for MATLAB
 
+[![MATLAB CI](https://github.com/PVDecker1/uihtml-debugger/actions/workflows/matlab-tests.yml/badge.svg)](https://github.com/PVDecker1/uihtml-debugger/actions/workflows/matlab-tests.yml)
+[![codecov](https://codecov.io/github/PVDecker1/uihtml-debugger/graph/badge.svg?token=EZZXSUQ4LT)](https://codecov.io/github/PVDecker1/uihtml-debugger)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 The UIHTML Debugger is a non-intrusive toolkit designed to bridge the gap between MATLAB and JavaScript development. It provides two essential tools to streamline web-based UI development within MATLAB:
 
 1.  **Console Error Rerouter**: Forwards console.log, warn, and error messages directly to the MATLAB Command Window.
