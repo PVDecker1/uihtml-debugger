@@ -28,7 +28,9 @@ jobs:
       - name: Run tests
         uses: matlab-actions/run-command@v2
         with:
-          command: runTests
+          command: |
+            openProject("uihtml-debugger.prj");
+            runTests;
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
