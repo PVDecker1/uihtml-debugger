@@ -299,10 +299,10 @@ classdef tConsoleErrorRerouter < matlab.mock.TestCase
                 mockComp.HTMLSource = htmlFile;
                 rerouter = ConsoleErrorRerouter(mockComp);
                 
-                % Make the temp file read-only so delete(rerouter) fails to delete it
+                % On Linux, to make delete fail, we make the directory read-only
                 tempFile = string(mockComp.HTMLSource);
-                fileattrib(tempFile, '-w');
-                testCase.addTeardown(@() fileattrib(tempFile, '+w'));
+                fileattrib(tempDir, '-w');
+                testCase.addTeardown(@() fileattrib(tempDir, '+w'));
                 
                 testCase.verifyWarning(@() delete(rerouter), "ConsoleErrorRerouter:FailedCleanup");
             end

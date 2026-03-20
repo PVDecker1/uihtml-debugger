@@ -160,14 +160,9 @@ classdef tUIHTMLDevTools < matlab.unittest.TestCase
                 mockComp.HTMLSource = htmlFile;
                 devTools = UIHTMLDevTools(mockComp);
                 
-                % Make the temp file and eruda.js read-only
-                tempFile = string(mockComp.HTMLSource);
-                pErudaDest = fullfile(tempDir, "eruda.js");
-                
-                fileattrib(tempFile, '-w');
-                testCase.addTeardown(@() fileattrib(tempFile, '+w'));
-                fileattrib(pErudaDest, '-w');
-                testCase.addTeardown(@() fileattrib(pErudaDest, '+w'));
+                % On Linux, to make delete fail, we make the directory read-only
+                fileattrib(tempDir, '-w');
+                testCase.addTeardown(@() fileattrib(tempDir, '+w'));
                 
                 testCase.verifyWarning(@() delete(devTools), "uihtmlDevTools:FailedCleanup");
             end
@@ -178,7 +173,9 @@ classdef tUIHTMLDevTools < matlab.unittest.TestCase
             
             % Delete files manually before object delete
             tempFile = string(testCase.Component.HTMLSource);
-            delete(tempFile);
+            if isfile(tempFile)
+                delete(tempFile);
+            end
             
             targetDir = fileparts(testCase.FixtureHtml);
             pErudaDest = fullfile(targetDir, "eruda.js");
@@ -225,14 +222,16 @@ classdef tUIHTMLDevTools < matlab.unittest.TestCase
                 htmlFile = fullfile(tempDir, "test.html");
                 writelines("<html><body></body></html>", htmlFile);
                 
-                % Make dir read-only
+                % Make dir read-only. This will cause either ErudaCopyFailure (first)
+                % or TempWriteFailure to occur.
                 fileattrib(tempDir, '-w');
                 testCase.addTeardown(@() fileattrib(tempDir, '+w'));
                 
                 mockComp = MockComponent();
                 mockComp.HTMLSource = htmlFile;
+                % On Linux, copyfile hits the read-only dir first.
                 testCase.verifyError(@() UIHTMLDevTools(mockComp), ...
-                    "uihtmlDevTools:TempWriteFailure");
+                    "(uihtmlDevTools:TempWriteFailure|uihtmlDevTools:ErudaCopyFailure)");
             end
         end % function testTempWriteFailure
 
@@ -244,12 +243,9 @@ classdef tUIHTMLDevTools < matlab.unittest.TestCase
                 htmlFile = fullfile(tempDir, "test.html");
                 writelines("<html><body></body></html>", htmlFile);
                 
-                % Pre-create eruda.js and make it read-only or make dir read-only
-                % Actually copyfile might fail if dest is read-only.
-                pErudaDest = fullfile(tempDir, "eruda.js");
-                writelines("locked", pErudaDest);
-                fileattrib(pErudaDest, '-w');
-                testCase.addTeardown(@() fileattrib(pErudaDest, '+w'));
+                % On Linux, to make copyfile/delete fail, we make the directory read-only
+                fileattrib(tempDir, '-w');
+                testCase.addTeardown(@() fileattrib(tempDir, '+w'));
                 
                 mockComp = MockComponent();
                 mockComp.HTMLSource = htmlFile;

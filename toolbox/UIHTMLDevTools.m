@@ -143,9 +143,8 @@ classdef UIHTMLDevTools < handle
 
             % Delete temporary HTML file
             if strlength(obj.TempHTMLPath) > 0 && isfile(obj.TempHTMLPath)
-                try
-                    delete(obj.TempHTMLPath);
-                catch
+                delete(obj.TempHTMLPath);
+                if isfile(obj.TempHTMLPath)
                     warning("uihtmlDevTools:FailedCleanup", ...
                         "Failed to delete %s. Please check your file system", ...
                         obj.TempHTMLPath)
@@ -160,9 +159,8 @@ classdef UIHTMLDevTools < handle
                 end
                 pErudaDest = fullfile(targetDir, "eruda.js");
                 if isfile(pErudaDest)
-                    try
-                        delete(pErudaDest);
-                    catch
+                    delete(pErudaDest);
+                    if isfile(pErudaDest)
                         warning("uihtmlDevTools:FailedCleanup", ...
                             "Failed to delete %s. Please check your file system", ...
                             pErudaDest)

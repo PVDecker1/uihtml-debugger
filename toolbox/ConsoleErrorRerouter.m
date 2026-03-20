@@ -145,9 +145,8 @@ classdef ConsoleErrorRerouter < handle
 
             % Delete temporary HTML file
             if ~isempty(obj.TempHTMLPath) && isfile(obj.TempHTMLPath)
-                try
-                    delete(obj.TempHTMLPath);
-                catch
+                delete(obj.TempHTMLPath);
+                if isfile(obj.TempHTMLPath)
                     warning("ConsoleErrorRerouter:FailedCleanup", ...
                         "Failed to delete %s. Please check your file system", ...
                         obj.TempHTMLPath)
